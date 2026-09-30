@@ -8,10 +8,11 @@ import { getOperation, getSessionById } from "./payments/sessions";
 import { notAvailable, type DomainHandlers, type RouteKey } from "./domain";
 import { mountSandbox, mountSandboxActions } from "./sandbox";
 import { KEY_ID, KEY_VALID_FROM, buildServiceDeps } from "./domain/wire";
-import { publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type CommitManifest, type TransactionManifest } from "@intyr/core";
+import { integrityProofState, publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type CommitManifest, type TransactionManifest } from "@intyr/core";
 import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
 import { checkAnchor } from "./anchor";
+import { anchorAccounts } from "./anchor-accounts";
 import { getRefundBySession, summarize } from "./payments/refunds";
 
 export interface NetworkDeps {
@@ -207,8 +208,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
       if (!signed || typeof signed !== "object") return c.json({ error: "INVALID_REQUEST", message: "Send {signed} or {manifest_id}." }, 422);
       const result = await verifyManifestDocument(signed as Signed<CommitManifest | TransactionManifest>, keys);
       if (!result.ok) {
-        const proof_state = result.reason === "HASH_MISMATCH" ? "HASH_MISMATCH" : "SIGNATURE_INVALID";
-        return c.json({ proof_state, integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
+        return c.json({ proof_state: integrityProofState(result), integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root", "decisions_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
       }
       const doc = signed as Signed<CommitManifest | TransactionManifest>;
       const anchorRow = await store.getAnchor(doc.payload.manifest_id);
@@ -218,7 +218,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         proof_state,
         integrity: "VALID",
         anchor: { ...anchor, network: n.net.caip2, ...("txid" in anchor ? { explorer: n.net.explorerTx(anchor.txid) } : {}) },
-        checked: ["payload_hash", "signature", "component_root", "anchor_note"],
+        checked: ["payload_hash", "signature", "component_root", "decisions_root", "anchor_note"],
         keys: keys.map((k) => k.key_id),
         note: VERIFY_NOTE,
       });
@@ -252,7 +252,15 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
     });
   }
 
-  app.get("/.well-known/intyr-signing-keys.json", (c) => c.json({ keys: publishedKeys(deps.env), algorithm: "Ed25519", contexts: ["intyr/plan/v1", "intyr/manifest/v1", "intyr/transaction/v1", "intyr/status/v1", "intyr/decision/v1"], note: "Signed bytes are the context, a newline, then the RFC 8785 canonical JSON of the payload." }));
+  app.get("/.well-known/intyr-signing-keys.json", (c) =>
+    c.json({
+      keys: publishedKeys(deps.env),
+      algorithm: "Ed25519",
+      contexts: ["intyr/plan/v1", "intyr/manifest/v1", "intyr/transaction/v1", "intyr/status/v1"],
+      anchor_accounts: anchorAccounts(deps.env),
+      note: "Signed bytes are the context, a newline, then the RFC 8785 canonical JSON of the payload. An anchor note counts only when it was sent by the account listed for its network.",
+    }),
+  );
   app.get("/healthz", (c) => c.json({ ok: true, networks: nets.map((n) => n.net.name) }));
   app.get("/version", (c) => c.json({ ...deps.version, networks: nets.map((n) => ({ name: n.net.name, caip2: n.net.caip2, usdc_asset_id: n.net.usdcAssetId })) }));
 

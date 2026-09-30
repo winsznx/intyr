@@ -1,6 +1,7 @@
 import algosdk from "algosdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { generateSigningKey } from "@intyr/core";
+import { generateSigningKey, signTransactionManifest, signingKeyFromJwkJson, type TransactionManifest } from "@intyr/core";
+import { KEY_ID } from "../src/domain/wire";
 import type { Env } from "../src/env";
 import { createApp } from "../src/app";
 import { networkConfig } from "../src/config";
@@ -46,7 +47,7 @@ async function anchoredApp() {
   const net = networkConfig("testnet");
   const app = createApp({ env, version: { name: "t", commit: "t", contract_versions: {} }, testnet: { net, payTo: "PAYTO", ladder: (() => new Response("no")) as never, domain: {} } });
   const s = await app.request("https://x.test/sandbox/session", { method: "POST" });
-  return { app, cookie: s.headers.get("set-cookie")!.split(";")[0]!, db };
+  return { app, cookie: s.headers.get("set-cookie")!.split(";")[0]!, db, pair, address: account.addr.toString() };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -93,5 +94,25 @@ describe("pending anchor", () => {
     expect(await reconcileAnchors(new TripStore(db), networkConfig("testnet"), new Date())).toBeGreaterThan(0);
     const after = (await (await app.request(`https://x.test/sandbox/v1/trips/${run.trip_id}`, { headers: { cookie } })).json()) as { anchor: { state: string; txid: string } };
     expect(after.anchor.state).toBe("CONFIRMED");
+  });
+});
+
+describe("proof documents", () => {
+  it("publishes the anchor account of each configured network and only the contexts the API signs", async () => {
+    const { app, address } = await anchoredApp();
+    const doc = (await (await app.request("https://x.test/.well-known/intyr-signing-keys.json")).json()) as { anchor_accounts: Record<string, string>; contexts: string[] };
+    expect(doc.anchor_accounts).toEqual({ [networkConfig("testnet").caip2]: address });
+    expect(doc.contexts).toEqual(["intyr/plan/v1", "intyr/manifest/v1", "intyr/transaction/v1", "intyr/status/v1"]);
+  });
+
+  it("reports a correctly signed manifest with a wrong decisions root as HASH_MISMATCH, not a bad signature", async () => {
+    installChain();
+    const { app, cookie, pair } = await anchoredApp();
+    const run = (await (await app.request("https://x.test/sandbox/v1/demo/run", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ scenario: "happy", seed: 61 }) })).json()) as { trip_id: string };
+    const trip = (await (await app.request(`https://x.test/sandbox/v1/trips/${run.trip_id}`, { headers: { cookie } })).json()) as { final_manifest_id: string };
+    const stored = (await (await app.request(`https://x.test/sandbox/v1/manifests/${trip.final_manifest_id}`)).json()) as { signed: { payload: TransactionManifest } };
+    const forged = await signTransactionManifest(signingKeyFromJwkJson(KEY_ID, JSON.stringify(pair.privateJwk)), { ...stored.signed.payload, decisions_root: `sha256:${"0".repeat(64)}` });
+    const res = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ signed: forged }) })).json()) as { proof_state: string; reason: string };
+    expect(res).toMatchObject({ proof_state: "HASH_MISMATCH", reason: "DECISIONS_ROOT_MISMATCH" });
   });
 });
