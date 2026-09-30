@@ -116,10 +116,19 @@ in a hash-chained decision log. Choosing not to act gets recorded just like acti
 
 ## Evidence
 
-[evidence/campaign-001/SUMMARY.md](evidence/campaign-001/SUMMARY.md) runs the same eleven fault cells against
-a naive sequential agent and a competent independent script on the seeded simulator, 110 runs each. An auditor
-counts what each run left behind by reading the simulator's own order list. The Intyr arm's results are added
-when recorded.
+Campaign 001 ran eleven fault cells on the seeded simulator against a naive agent, a careful script and
+Intyr, 110 runs each. It was pre-registered in git before any run. The results are in
+[evidence/campaign-001/RESULTS.md](evidence/campaign-001/RESULTS.md), worst finding first.
+
+- Intyr lost one cell (F10) to the careful script. It committed a cheaper hotel that refused every
+  cancellation ahead of a flight that was refused, and reported the stranded hotel accurately.
+- It matched the script in the other ten cells.
+- The naive agent ended consistent in 36 percent of runs, against 100 percent for the script and 92 percent for
+  Intyr.
+
+The pre-registered headline, "more reliable than a careful script", is not supported. The claim that stands is
+that Intyr gives an agent the careful script's behaviour as one paid call per step, 2.9 calls per trip, with
+signed records, and matched it in ten of eleven cells.
 
 A real-supplier sandbox trip (record `man_6e12c241db89cf1968e97636`) committed cleanly. A person approved it,
 then Duffel test mode and the LiteAPI sandbox each confirmed their leg on read-back. The bookings are

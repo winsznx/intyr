@@ -109,10 +109,37 @@ The same hash was anchored on TestNet later, in transaction `WHP6YBEIU3B4QR3RMA2
 at round 67823189, with note `intyr:prereg:v1:<hash>`. The anchor was sent from the TestNet payer account. The
 git commit is what predates the runs. The anchor proves the committed file wasn't changed after that round.
 
-`evidence/campaign-001/SUMMARY.md` compares a naive sequential agent (B0) with a competent independent
-script (B1) on the seeded simulator: 110 runs each, with an auditor that reads the simulator's own order list.
-B0 ends consistent in 36 percent of runs and B1 in 100 percent. The Intyr arm (T) runs over HTTP against the
-sandbox, and its results are reported only when recorded. `[update when the T arm lands]`
+Campaign 001 ran three arms, 110 runs each, over eleven fault cells on the seeded simulator: a naive
+sequential agent (B0), a careful independent script (B1) and Intyr over HTTP (T). An auditor read the
+simulator's own order list. Results are in `evidence/campaign-001/RESULTS.md`, worst finding first:
+
+1. Intyr lost one cell to the careful script. In F10 the hotel refuses every cancellation and the flight is
+   refused. Intyr commits equal-risk legs by earliest expiry and then price, so it committed the cheaper hotel
+   first. In 9 of 10 runs the trip ended `RECOVERY_FAILED` with the hotel stranded, $163.78 per trip on
+   average. The script commits in request order, flight first, and ended with nothing booked in 10 of 10.
+   Intyr's report was accurate every time.
+2. In the other ten cells Intyr matched the careful script, with no duplicates and no belief contradicting the
+   supplier. That includes a lost response after booking, a blind-retry double-book trap, an asynchronous
+   failure and a false confirmation.
+3. The naive agent ended consistent in 36 percent of runs, with 20 duplicate orders.
+
+| Arm | Consistent terminal rate | Completion when feasible | Orphan USD per 100 trips | Duplicates | Caller effort |
+|---|---|---|---|---|---|
+| B0 naive | 36% | 25% | 24,914.94 | 20 | 3.6 supplier calls |
+| B1 careful script | 100% | 75% | 0.00 | 0 | 8.7 supplier calls, 431 lines of its own code |
+| T Intyr | 92% | 75% | 1,488.92 | 0 | 2.9 calls to Intyr |
+
+The pre-registered headline, "more reliable than a careful script", is not supported. Per the pre-registered
+rule, the claim is narrowed to this, quoted from RESULTS.md:
+
+> Under ten documented supplier fault patterns, a naive agent leaves bookings stranded or duplicated in most
+> runs. A careful engineer's script avoids that. Intyr provides the same careful behaviour as one paid call per
+> step, 2.9 calls per trip from the caller's side, with signed manifests and decision records, and it matched
+> that script in ten of eleven cells and lost one.
+
+The F10 loss and the first real-supplier failure share one cause, the tie-break among equally risky legs.
+Committing the weakest hold first is the recorded next change. It was not made during the campaign, so these
+numbers describe the code that ran.
 
 A real-supplier sandbox trip committed cleanly. It's trip `trp_0f0591dc5e1c0d4b920b33a9`, with transaction
 manifest `man_6e12c241db89cf1968e97636`.
