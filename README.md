@@ -116,6 +116,11 @@ a naive sequential agent and a competent independent script on the seeded simula
 counts what each run left behind by reading the simulator's own order list. The Intyr arm's results are added
 when recorded.
 
+The first real-supplier sandbox run (record `man_4fce63d207b53b0a5def9130`) ended `RECOVERY_FAILED`. A
+non-refundable LiteAPI sandbox hotel confirmed, then Duffel test mode rejected the flight, and cancelling the
+hotel would have cost more than the approved headroom. The signed record states the 192.36 EUR left stranded
+in the sandbox. Both causes are fixed, and [docs/SUBMISSION.md](docs/SUBMISSION.md) has the details.
+
 ## Develop
 
 ```sh

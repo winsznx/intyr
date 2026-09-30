@@ -108,6 +108,25 @@ script (B1) on the seeded simulator: 110 runs each, with an auditor that reads t
 B0 ends consistent in 36 percent of runs and B1 in 100 percent. The Intyr arm (T) runs over HTTP against the
 sandbox, and its results are reported only when recorded. `[update when the T arm lands]`
 
+The first real-supplier sandbox run went wrong, and it's kept as evidence. It's trip `trp_d261cfdcabc61cbc93f83adb`,
+with transaction manifest `man_4fce63d207b53b0a5def9130`.
+- A person approved the commit under `sandbox-supplier-v1`.
+- The LiteAPI sandbox hotel confirmed on read-back.
+- Then Duffel test mode rejected the flight with `born_on_does_not_match`: the adapter searched with a traveler
+  age that didn't match the date of birth.
+- The hotel rate was non-refundable, so cancelling it needed spend beyond the approved headroom. Intyr asked a
+  person instead of spending.
+- The trip ended `RECOVERY_FAILED`, with 192.36 EUR stranded in the sandbox, and the signed record says so. No
+  real money moved.
+The record verifies with `pnpm --filter @intyr/verifier verify man_4fce63d207b53b0a5def9130 --sandbox`. It
+returns `PROOF_PARTIAL`, meaning it's signed and intact but not yet anchored.
+
+The two causes are fixed. The Duffel search now uses the traveler's age on the travel date, and the LiteAPI
+adapter prefers a refundable rate within the price cap. With a refundable rate, the hotel orders ahead of the
+flight as reversible and can be cancelled if the flight fails. One planner change is recorded for later:
+among legs that are equally irreversible, commit the weakest hold first. That would have tried the flight
+before the hotel here.
+
 ## Demo video
 
 `[OWNER: video link, 3 to 5 minutes]`. The script is in `docs/VIDEO_SCRIPT.md`.
