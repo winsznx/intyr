@@ -1,5 +1,9 @@
 # Registering Intyr with Electric Capital
 
+Status: pull request https://github.com/electric-capital/open-dev-data/pull/3079 was opened on 2026-10-01 with
+the file `migrations/2026-10-01T000800_add_intyr_to_algorand`. It is waiting for review. The steps below
+record how it was done.
+
 The challenge asks each project to appear in Electric Capital's open developer data under the Algorand
 ecosystem. The owner opens this pull request from their own GitHub account once the repository is public.
 
