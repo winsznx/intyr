@@ -219,9 +219,14 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         const other = n.net.name === "mainnet" ? "/sandbox/v1" : "/v1";
         return c.json({ error: "WRONG_NETWORK", message: `This record was issued on ${String(issuedOn)}, not ${n.net.name.toUpperCase()}. Verify it at ${other}/manifests/verify.`, verify_at: `${other}/manifests/verify` }, 422);
       }
+      const payload = ((signed as { payload?: Record<string, unknown> }).payload ?? {}) as Record<string, unknown>;
+      const identity = {
+        manifest_id: typeof payload.manifest_id === "string" ? payload.manifest_id : typeof payload.plan_id === "string" ? payload.plan_id : null,
+        environment: typeof payload.environment === "string" ? payload.environment : null,
+      };
       const result = await verifyManifestDocument(signed as Signed<SignedRecord>, keys);
       if (!result.ok) {
-        return c.json({ proof_state: integrityProofState(result), integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root", "decisions_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
+        return c.json({ ...identity, proof_state: integrityProofState(result), integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root", "decisions_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
       }
       const doc = signed as Signed<SignedRecord>;
       const recordId = "plan_id" in doc.payload ? doc.payload.plan_id : doc.payload.manifest_id;
@@ -229,6 +234,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
       const anchor = anchorRow && anchorRow.network === n.net.name ? await checkAnchor(n.net, anchorRow.txid, doc.payload_hash) : ({ state: "ANCHOR_NOT_FOUND" } as const);
       const proof_state = anchor.state === "ANCHOR_CONFIRMED" ? "PROOF_VERIFIED" : anchor.state === "HASH_MISMATCH" ? "HASH_MISMATCH" : "PROOF_PARTIAL";
       return c.json({
+        ...identity,
         proof_state,
         integrity: "VALID",
         anchor: { ...anchor, network: n.net.caip2, ...("txid" in anchor ? { explorer: n.net.explorerTx(anchor.txid) } : {}) },

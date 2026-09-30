@@ -350,7 +350,6 @@ export async function runPrepare(intent: PublicTripIntent, ctx: PaidContext, dep
   doc.deadline = build.expiresAt;
   doc.manifest_id = build.manifestId;
   doc.manifest_hash = build.hash;
-  doc.plan_id = build.decision.decision_id;
   doc.approval_required = build.approvalRequired;
   const trip = await deps.store.createTrip({
     id: tripId,

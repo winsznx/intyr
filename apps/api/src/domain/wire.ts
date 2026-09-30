@@ -109,7 +109,7 @@ export function createDomain(env: Env, environment: Environment): Domain {
   const net = networkConfig(environment === "MAINNET" ? "mainnet" : "testnet", env);
   return {
     handlers,
-    reconcile: async () => (await reconcileUnknownTrips(deps, sessionForTrip)) + (await reconcileAnchors(store, net, deps.now())),
+    reconcile: async () => (await reconcileUnknownTrips(deps, sessionForTrip)) + (await reconcileAnchors(store, net, deps.now(), undefined, deps.anchor ? (id, hash) => deps.anchor!(id, hash, { wait: false }) : undefined)),
   };
 }
 

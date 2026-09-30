@@ -64,8 +64,8 @@ describe("anchored proof", () => {
     expect(stored.anchor).toMatchObject({ state: "CONFIRMED", txid: trip.anchor.txid, confirmed_round: 700 });
     expect(stored.anchor.explorer).toContain(trip.anchor.txid);
 
-    const verified = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ manifest_id: trip.final_manifest_id }) })).json()) as { proof_state: string; anchor: { state: string; round: number } };
-    expect(verified).toMatchObject({ proof_state: "PROOF_VERIFIED", anchor: { state: "ANCHOR_CONFIRMED", round: 700 } });
+    const verified = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ manifest_id: trip.final_manifest_id }) })).json()) as { proof_state: string; anchor: { state: string; round: number }; manifest_id: string; environment: string };
+    expect(verified).toMatchObject({ proof_state: "PROOF_VERIFIED", anchor: { state: "ANCHOR_CONFIRMED", round: 700 }, manifest_id: trip.final_manifest_id, environment: "TESTNET" });
   });
 
   it("reports PROOF_PARTIAL for a valid signature that carries no anchor", async () => {

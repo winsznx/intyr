@@ -192,6 +192,27 @@ export class TripStore {
     return this.db.prepare("SELECT manifest_hash, decision FROM approvals WHERE trip_id = ?1 ORDER BY created_at DESC LIMIT 1").bind(tripId).first();
   }
 
+  /** Records the intent to anchor before any chain call, so a failure before the transaction exists is still retried. */
+  async queueAnchor(a: { manifest_id: string; network: string; mode: string; now: string }): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO anchors (manifest_id, network, mode, txid, state, created_at, updated_at) VALUES (?1,?2,?3,NULL,'QUEUED',?4,?4)
+         ON CONFLICT(manifest_id) DO UPDATE SET updated_at = excluded.updated_at WHERE anchors.state = 'QUEUED'`,
+      )
+      .bind(a.manifest_id, a.network, a.mode, a.now)
+      .run();
+  }
+
+  /** Puts an anchor whose transaction never reached the network back in the queue. */
+  async requeueAnchor(manifestId: string, now: string): Promise<void> {
+    await this.db.prepare("UPDATE anchors SET state = 'QUEUED', txid = NULL, updated_at = ?1 WHERE manifest_id = ?2").bind(now, manifestId).run();
+  }
+
+  async listQueuedAnchors(notTouchedSince: string, limit = 10): Promise<Array<{ manifest_id: string; network: string; created_at: string }>> {
+    const r = await this.db.prepare("SELECT manifest_id, network, created_at FROM anchors WHERE state = 'QUEUED' AND updated_at <= ?1 ORDER BY updated_at LIMIT ?2").bind(notTouchedSince, limit).all<{ manifest_id: string; network: string; created_at: string }>();
+    return r.results ?? [];
+  }
+
   async putAnchor(a: { manifest_id: string; network: string; mode: string; txid: string; state: string; now: string }): Promise<void> {
     await this.db
       .prepare(

@@ -126,3 +126,59 @@ describe("checkAnchor", () => {
     expect((await checkAnchor(net, "TX", HASH, async () => { throw new Error("offline"); })).state).toBe("INDEXER_UNAVAILABLE");
   });
 });
+
+describe("anchors that never reached a node", () => {
+  const failingParams: typeof fetch = async () => new Response("down", { status: 502 });
+  const manifestRow = (id: string, hash: string) => ({ id, trip_id: null, kind: "PLAN" as const, hash, status: "ACTIVE" as const, expires_at: null, network: "testnet", signed_json: "{}", now: new Date().toISOString() });
+
+  it("keeps a queued row when the chain call fails before any transaction exists", async () => {
+    const store = new TripStore(createTestD1());
+    await expect(anchorHash(signer(failingParams), "man_q1", HASH, store)).rejects.toThrow();
+    expect(await store.getAnchor("man_q1")).toMatchObject({ state: "QUEUED", txid: null });
+  });
+
+  it("puts the anchor back in the queue when the submit never got an answer from a node, but fails one that was rejected", async () => {
+    const store = new TripStore(createTestD1());
+    const chain = chainFake();
+    const flaky: typeof fetch = async (input, init) => (String(input).endsWith("/v2/transactions") && init?.method === "POST" ? new Response("unavailable", { status: 503 }) : chain.fetchFn(input, init));
+    await expect(anchorHash(signer(flaky), "man_q2", HASH, store)).rejects.toThrow();
+    expect(await store.getAnchor("man_q2")).toMatchObject({ state: "QUEUED", txid: null });
+
+    await expect(anchorHash(signer(chainFake({ rejectSubmit: true }).fetchFn), "man_q3", HASH, store)).rejects.toThrow();
+    expect(await store.getAnchor("man_q3")).toMatchObject({ state: "FAILED" });
+  });
+
+  it("has the cron submit a queued anchor again from the stored record and then confirm it", async () => {
+    const store = new TripStore(createTestD1());
+    await store.putManifest(manifestRow("man_q4", HASH));
+    await expect(anchorHash(signer(failingParams), "man_q4", HASH, store)).rejects.toThrow();
+
+    const chain = chainFake();
+    const resubmit = (id: string, hash: string) => anchorHash({ ...signer(chain.fetchFn), confirmWaitMs: 0 }, id, hash, store);
+    expect(await reconcileAnchors(store, net, new Date(), chain.fetchFn, resubmit)).toBe(0);
+
+    const later = new Date(Date.now() + 2 * 60_000);
+    expect(await reconcileAnchors(store, net, later, chain.fetchFn, resubmit)).toBe(1);
+    expect((await store.getAnchor("man_q4"))?.state).toBe("CONFIRMED");
+    expect(chain.submitted).toHaveLength(1);
+    expect(new TextDecoder().decode(algosdk.decodeSignedTransaction(chain.submitted[0]!).txn.note)).toBe(noteFor(HASH));
+  });
+
+  it("gives up on a queued anchor with no stored record or after an hour", async () => {
+    const store = new TripStore(createTestD1());
+    const chain = chainFake();
+    const resubmit = async () => {
+      throw new Error("still down");
+    };
+    await expect(anchorHash(signer(failingParams), "man_q5", HASH, store)).rejects.toThrow();
+    await reconcileAnchors(store, net, new Date(Date.now() + 2 * 60_000), chain.fetchFn, resubmit);
+    expect(await store.getAnchor("man_q5")).toMatchObject({ state: "FAILED", error: "no stored record to anchor" });
+
+    await store.putManifest(manifestRow("man_q6", HASH));
+    await expect(anchorHash(signer(failingParams), "man_q6", HASH, store)).rejects.toThrow();
+    await reconcileAnchors(store, net, new Date(Date.now() + 2 * 60_000), chain.fetchFn, resubmit);
+    expect((await store.getAnchor("man_q6"))?.state).toBe("QUEUED");
+    await reconcileAnchors(store, net, new Date(Date.now() + 2 * 3600_000), chain.fetchFn, resubmit);
+    expect(await store.getAnchor("man_q6")).toMatchObject({ state: "FAILED", error: "could not be submitted within an hour" });
+  });
+});

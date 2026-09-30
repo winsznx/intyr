@@ -28,6 +28,7 @@ export function noteFor(manifestHash: string): string {
  */
 export async function anchorHash(signer: AnchorSigner, manifestId: string, manifestHash: string, store?: TripStore): Promise<AnchorRef & { state: "CONFIRMED" | "PENDING" }> {
   const fetchFn = signer.fetchFn ?? chainFetch;
+  await store?.queueAnchor({ manifest_id: manifestId, network: signer.net.name, mode: "SEPARATE_NOTE_TRANSACTION", now: new Date().toISOString() });
   const sleep = signer.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const account = algosdk.mnemonicToSecretKey(signer.mnemonic);
   const suggestedParams = await getSuggestedParams(signer.net, fetchFn);
@@ -45,7 +46,9 @@ export async function anchorHash(signer: AnchorSigner, manifestId: string, manif
   try {
     await submitSigned(signer.net, txn.signTxn(account.sk), fetchFn);
   } catch (e) {
+    // A rejection is final. Anything else means the transaction may never have reached a node, so it goes back in the queue.
     if (e instanceof RejectedError) await store?.updateAnchor(manifestId, { state: "FAILED", error: e.message, now: new Date().toISOString() });
+    else await store?.requeueAnchor(manifestId, new Date().toISOString());
     throw new Error(`anchor submit failed: ${e instanceof Error ? e.message : String(e)}`);
   }
   const deadline = Date.now() + (signer.confirmWaitMs ?? 6000);
@@ -110,6 +113,9 @@ export async function checkAnchor(net: NetworkConfig, txid: string | null, manif
 /** A transaction is valid for about 47 minutes, so one that is still unseen an hour later can never confirm. */
 const ANCHOR_EXPIRY_MS = 60 * 60_000;
 
+/** A request that is still submitting its anchor touches the row within this long, so the cron leaves it alone until then. */
+const QUEUED_RETRY_AFTER_MS = 60_000;
+
 /** Mirrors a settled anchor into the trip document that shows it, so a trip never keeps reading PENDING. */
 async function syncTripAnchor(store: TripStore, manifestId: string, txid: string, state: "CONFIRMED" | "FAILED", now: string): Promise<void> {
   const manifest = await store.getManifest(manifestId);
@@ -124,7 +130,13 @@ async function syncTripAnchor(store: TripStore, manifestId: string, txid: string
  * Cron step: settles anchors that were submitted but not seen in a block when their request ended. Each poll touches
  * the row so a stuck anchor cannot starve newer ones, and an anchor unseen past its validity window is marked FAILED.
  */
-export async function reconcileAnchors(store: TripStore, net: NetworkConfig, now: Date, fetchFn: typeof fetch = chainFetch): Promise<number> {
+export async function reconcileAnchors(
+  store: TripStore,
+  net: NetworkConfig,
+  now: Date,
+  fetchFn: typeof fetch = chainFetch,
+  resubmit?: (manifestId: string, manifestHash: string) => Promise<unknown>,
+): Promise<number> {
   const pending = (await store.listPendingAnchors(20)).filter((a) => a.network === net.name);
   let settled = 0;
   for (const a of pending) {
@@ -141,5 +153,27 @@ export async function reconcileAnchors(store: TripStore, net: NetworkConfig, now
       await store.updateAnchor(a.manifest_id, { state: "PENDING", now: now.toISOString() });
     }
   }
+  if (resubmit) settled += await retryQueuedAnchors(store, net, now, resubmit);
   return settled;
+}
+
+/** A queued anchor is one whose transaction was never built or never reached a node. The record it anchors is read back from storage. */
+async function retryQueuedAnchors(store: TripStore, net: NetworkConfig, now: Date, resubmit: (manifestId: string, manifestHash: string) => Promise<unknown>): Promise<number> {
+  const untouched = new Date(now.getTime() - QUEUED_RETRY_AFTER_MS).toISOString();
+  let done = 0;
+  for (const queued of (await store.listQueuedAnchors(untouched)).filter((a) => a.network === net.name)) {
+    const manifest = await store.getManifest(queued.manifest_id);
+    if (!manifest || now.getTime() - Date.parse(queued.created_at) > ANCHOR_EXPIRY_MS) {
+      await store.updateAnchor(queued.manifest_id, { state: "FAILED", error: manifest ? "could not be submitted within an hour" : "no stored record to anchor", now: now.toISOString() });
+      done++;
+      continue;
+    }
+    try {
+      await resubmit(queued.manifest_id, manifest.hash);
+      done++;
+    } catch (e) {
+      console.error("anchor retry failed", queued.manifest_id, e instanceof Error ? e.message : String(e));
+    }
+  }
+  return done;
 }
