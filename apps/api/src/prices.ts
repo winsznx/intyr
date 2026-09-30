@@ -16,7 +16,7 @@ export const ROUTE_PRICES: RoutePrice[] = [
     path: "/v1/trips/check",
     name: "Check a trip before committing",
     description:
-      "Send 2 to 6 legs (flight, hotel, transfer). Get a safe commit order, the firmness of each leg, what cannot be undone, a verdict.",
+      "Send 1 to 8 legs (flight, hotel, transfer) you already found. Get a commit order that puts what can be undone first, the firmness of each leg, what cannot be undone, and a verdict.",
     amountAtomic: "100000",
     unique_output: "signed commit plan with commit order, per-leg hold strength, irreversible exposure and verdict",
     fee_disposition: "kept unless Intyr fails to produce a plan, then refunded",
