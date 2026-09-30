@@ -1,0 +1,22 @@
+{
+  "name": "@intyr/eval",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Proof campaign: baseline arms, Intyr arm, independent auditor and metrics",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "campaign": "tsx src/run.ts"
+  },
+  "dependencies": {
+    "@intyr/adapters": "workspace:*",
+    "@intyr/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}
