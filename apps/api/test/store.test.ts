@@ -47,3 +47,15 @@ describe("TripStore", () => {
     expect((await s.getActiveManifest("trp_1"))?.id).toBe("man_2");
   });
 });
+
+import { D1SimulatorStore } from "../src/domain/adapters";
+
+describe("D1SimulatorStore", () => {
+  it("round-trips and overwrites values", async () => {
+    const s = new D1SimulatorStore(createTestD1());
+    expect(await s.get("k")).toBeNull();
+    await s.put("k", "1");
+    await s.put("k", "2");
+    expect(await s.get("k")).toBe("2");
+  });
+});
