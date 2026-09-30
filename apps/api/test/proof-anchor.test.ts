@@ -116,3 +116,49 @@ describe("proof documents", () => {
     expect(res).toMatchObject({ proof_state: "HASH_MISMATCH", reason: "DECISIONS_ROOT_MISMATCH" });
   });
 });
+
+describe("verify across the two hosts", () => {
+  async function bothNetworks() {
+    const pair = await generateSigningKey("k");
+    const account = algosdk.generateAccount();
+    const env = {
+      DB: createTestD1(),
+      FACILITATOR_URL: "x",
+      PAY_TO_TESTNET: "PAYTO",
+      PAY_TO_MAINNET: "PAYTOM",
+      MANIFEST_SIGNING_JWK: JSON.stringify(pair.privateJwk),
+      ANCHOR_MNEMONIC_TESTNET: algosdk.secretKeyToMnemonic(account.sk),
+      ANCHOR_CONFIRM_WAIT_MS: "0",
+    } as unknown as Env;
+    const deps = (name: "mainnet" | "testnet") => ({ net: networkConfig(name), payTo: "PAYTO", ladder: (() => new Response("no")) as never, domain: {} });
+    const app = createApp({ env, version: { name: "t", commit: "t", contract_versions: {} }, mainnet: deps("mainnet"), testnet: deps("testnet") });
+    const session = await app.request("https://x.test/sandbox/session", { method: "POST" });
+    const cookie = session.headers.get("set-cookie")!.split(";")[0]!;
+    const run = (await (await app.request("https://x.test/sandbox/v1/demo/run", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ scenario: "happy" }) })).json()) as { trip_id: string };
+    const trip = (await (await app.request(`https://x.test/sandbox/v1/trips/${run.trip_id}`, { headers: { cookie } })).json()) as { final_manifest_id: string; anchor: { txid: string } };
+    const verify = async (prefix: string, body: unknown) => {
+      const res = await app.request(`https://x.test${prefix}/manifests/verify`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+    };
+    return { app, trip, verify };
+  }
+
+  it("refuses a TestNet record on the Mainnet host and names the host that can verify it", async () => {
+    installChain();
+    const { app, trip, verify } = await bothNetworks();
+    const stored = (await (await app.request(`https://x.test/sandbox/v1/manifests/${trip.final_manifest_id}`)).json()) as { signed: unknown };
+
+    expect(await verify("/v1", { manifest_id: trip.final_manifest_id })).toMatchObject({ status: 404, body: { error: "NOT_FOUND" } });
+    expect(await verify("/v1", { signed: stored.signed })).toMatchObject({ status: 422, body: { error: "WRONG_NETWORK", verify_at: "/sandbox/v1/manifests/verify" } });
+    expect(await verify("/sandbox/v1", { signed: stored.signed })).toMatchObject({ status: 200, body: { proof_state: "PROOF_VERIFIED" } });
+  });
+
+  it("verifies by the anchor's transaction id on its own host only", async () => {
+    installChain();
+    const { trip, verify } = await bothNetworks();
+    expect(await verify("/sandbox/v1", { txid: trip.anchor.txid })).toMatchObject({ status: 200, body: { proof_state: "PROOF_VERIFIED", anchor: { txid: trip.anchor.txid } } });
+    expect(await verify("/v1", { txid: trip.anchor.txid })).toMatchObject({ status: 404 });
+    expect(await verify("/sandbox/v1", { txid: "NOSUCHTXID" })).toMatchObject({ status: 404 });
+    expect(await verify("/sandbox/v1", {})).toMatchObject({ status: 422 });
+  });
+});

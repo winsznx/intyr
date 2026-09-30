@@ -200,13 +200,25 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
     });
     app.post(`${prefix}/manifests/verify`, async (c) => {
       const keys = publishedKeys(deps.env);
-      const body = (await c.req.json().catch(() => null)) as { manifest_id?: string; signed?: unknown } | null;
+      const body = (await c.req.json().catch(() => null)) as { manifest_id?: string; signed?: unknown; txid?: string } | null;
       let signed: unknown = body?.signed;
-      if (!signed && body?.manifest_id) {
-        const row = await store.getManifest(body.manifest_id);
-        if (row) signed = JSON.parse(row.signed_json);
+      let lookupId = body?.manifest_id;
+      if (!signed && !lookupId && body?.txid) {
+        const anchored = await store.getAnchorByTxid(body.txid);
+        if (!anchored || anchored.network !== n.net.name) return c.json({ error: "NOT_FOUND", message: "No anchor with that transaction id is recorded on this host." }, 404);
+        lookupId = anchored.manifest_id;
       }
-      if (!signed || typeof signed !== "object") return c.json({ error: "INVALID_REQUEST", message: "Send {signed} or {manifest_id}." }, 422);
+      if (!signed && lookupId) {
+        const row = await store.getManifest(lookupId);
+        if (!row || row.network !== n.net.name) return c.json({ error: "NOT_FOUND" }, 404);
+        signed = JSON.parse(row.signed_json);
+      }
+      if (!signed || typeof signed !== "object") return c.json({ error: "INVALID_REQUEST", message: "Send {signed}, {manifest_id} or {txid}." }, 422);
+      const issuedOn = (signed as { payload?: { environment?: unknown } }).payload?.environment;
+      if (issuedOn !== undefined && issuedOn !== n.net.name.toUpperCase()) {
+        const other = n.net.name === "mainnet" ? "/sandbox/v1" : "/v1";
+        return c.json({ error: "WRONG_NETWORK", message: `This record was issued on ${String(issuedOn)}, not ${n.net.name.toUpperCase()}. Verify it at ${other}/manifests/verify.`, verify_at: `${other}/manifests/verify` }, 422);
+      }
       const result = await verifyManifestDocument(signed as Signed<SignedRecord>, keys);
       if (!result.ok) {
         return c.json({ proof_state: integrityProofState(result), integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root", "decisions_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
