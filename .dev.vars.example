@@ -1,0 +1,7 @@
+# Copy to .dev.vars (gitignored). Never commit real values.
+# Mainnet receiving address for x402 payments (public address only, opted in to USDC ASA 31566704)
+PAY_TO_MAINNET=
+# Duffel test-mode token (starts with duffel_test_)
+DUFFEL_TOKEN=
+# Nuitee LiteAPI sandbox key (starts with sand_)
+LITEAPI_KEY=

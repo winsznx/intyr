@@ -1,0 +1,20 @@
+{
+  "name": "intyr",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Payment-bound commit, recovery and verifiable receipts for AI agents that buy multi-supplier trips, paid per action over x402 on Algorand.",
+  "license": "MIT",
+  "packageManager": "pnpm@11.23.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "build": "pnpm -r --if-present build",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0",
+    "@types/node": "^22.10.0"
+  }
+}
