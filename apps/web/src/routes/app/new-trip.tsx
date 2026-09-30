@@ -68,27 +68,34 @@ interface Fields {
   maxMove: string;
 }
 
-const INITIAL: Fields = {
-  tripRef: "",
-  flight: true,
-  origin: "LHR",
-  destination: "JFK",
-  departDate: isoDate(21),
-  passengers: 1,
-  hold: false,
-  hotel: true,
-  city: "New York",
-  checkIn: isoDate(21),
-  checkOut: isoDate(23),
-  guests: 1,
-  ground: false,
-  from: "JFK",
-  to: "Midtown Manhattan",
-  pickupAt: `${isoDate(21)}T14:30`,
-  budget: "2500",
-  currency: "EUR",
-  maxMove: "2",
-};
+/**
+ * The default stay starts 30 to 59 days out. Supplier sandboxes have finite inventory,
+ * and a fixed date sells out once enough visitors book the same default.
+ */
+function initialFields(): Fields {
+  const start = 30 + Math.floor(Math.random() * 30);
+  return {
+    tripRef: "",
+    flight: true,
+    origin: "LHR",
+    destination: "JFK",
+    departDate: isoDate(start),
+    passengers: 1,
+    hold: false,
+    hotel: true,
+    city: "New York",
+    checkIn: isoDate(start),
+    checkOut: isoDate(start + 2),
+    guests: 1,
+    ground: false,
+    from: "JFK",
+    to: "Midtown Manhattan",
+    pickupAt: `${isoDate(start)}T14:30`,
+    budget: "2500",
+    currency: "EUR",
+    maxMove: "2",
+  };
+}
 
 function validate(f: Fields): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -135,7 +142,7 @@ function toIntent(f: Fields): TripIntent {
 export function NewTripPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("prepare");
-  const [fields, setFields] = useState<Fields>(INITIAL);
+  const [fields, setFields] = useState<Fields>(initialFields);
   const [checkJson, setCheckJson] = useState(() => JSON.stringify(CHECK_EXAMPLE, null, 2));
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
