@@ -1,0 +1,17 @@
+{
+  "t_arm": {
+    "base_url": "https://intyr.timjosh507.workers.dev",
+    "limits": {
+      "min_readiness": 30,
+      "max_price_move_pct": 10
+    },
+    "arm_file": "packages/eval/src/arms/t-http.ts",
+    "arm_sha256": "64d4f9180d657157ea4239334d5b34ad831e0422f44955661e8d450ef326c846",
+    "git_sha": "1fe2bae59fb8870c8d77aab8deb5acca70b6f405",
+    "runs": 40,
+    "artifacts": {
+      "results": "t-results.jsonl",
+      "transcripts": "t-transcripts.jsonl"
+    }
+  }
+}

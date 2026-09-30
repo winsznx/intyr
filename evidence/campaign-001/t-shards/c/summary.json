@@ -1,0 +1,52 @@
+{
+  "byArm": [
+    {
+      "arm": "T",
+      "cell": "ALL",
+      "n": 20,
+      "complete": 0,
+      "unwound": 20,
+      "inconsistent": 0,
+      "ctr": 1,
+      "orphan_usd_per_100": 0,
+      "duplicate_orders": 0,
+      "belief_mismatches": 0,
+      "belief_unknowns": 0,
+      "completion_rate": 0,
+      "mean_supplier_calls": 3,
+      "completion_when_feasible": 0
+    }
+  ],
+  "byCell": [
+    {
+      "arm": "T",
+      "cell": "F4",
+      "n": 10,
+      "complete": 0,
+      "unwound": 10,
+      "inconsistent": 0,
+      "ctr": 1,
+      "orphan_usd_per_100": 0,
+      "duplicate_orders": 0,
+      "belief_mismatches": 0,
+      "belief_unknowns": 0,
+      "completion_rate": 0,
+      "mean_supplier_calls": 3
+    },
+    {
+      "arm": "T",
+      "cell": "F7",
+      "n": 10,
+      "complete": 0,
+      "unwound": 10,
+      "inconsistent": 0,
+      "ctr": 1,
+      "orphan_usd_per_100": 0,
+      "duplicate_orders": 0,
+      "belief_mismatches": 0,
+      "belief_unknowns": 0,
+      "completion_rate": 0,
+      "mean_supplier_calls": 3
+    }
+  ]
+}

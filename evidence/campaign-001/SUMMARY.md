@@ -1,6 +1,6 @@
 # campaign-001
 
-Suppliers in these runs are the seeded simulator (SIMULATED). The auditor reads the simulator's order list, never an arm's own records.
+Suppliers in these runs are the seeded simulator (SIMULATED). B0 and B1 ran in process. T ran against the deployed Worker's sandbox routes under server-sponsored TestNet sessions, so no USDC moved. The auditor reads the simulator's order list, never an arm's own records.
 
 | Arm | Cell | Runs | Complete | Unwound | Inconsistent | CTR | Orphan USD / 100 trips | Duplicate orders | Belief mismatches |
 |---|---|---|---|---|---|---|---|---|---|
@@ -26,8 +26,20 @@ Suppliers in these runs are the seeded simulator (SIMULATED). The auditor reads 
 | B1 | F8 Flight response lost, supplier duplicates on retry | 10 | 10 | 0 | 0 | 100% | 0.00 | 0 | 0 |
 | B1 | F9 Non-refundable flight, hotel refuses | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
 | B1 | F10 Hotel cannot be cancelled, flight refuses | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | C0 Healthy control, no faults | 10 | 10 | 0 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F1 Flight reprices between quote and payment | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F2 Flight inventory gone at commit | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F3 Hotel refuses the booking after the flight confirmed | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F4 Flight accepted asynchronously, then fails | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F5 Flight booked but the response is lost | 10 | 10 | 0 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F6 Hotel times out and nothing was booked | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F7 Hotel says confirmed but no booking exists | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F8 Flight response lost, supplier duplicates on retry | 10 | 10 | 0 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F9 Non-refundable flight, hotel refuses | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
+| T | F10 Hotel cannot be cancelled, flight refuses | 10 | 0 | 1 | 9 | 10% | 16378.10 | 0 | 0 |
 
 | Arm | Runs | CTR | Completion when feasible | Orphan USD / 100 trips | Duplicate orders | Belief mismatches | Unknown beliefs | Mean supplier calls |
 |---|---|---|---|---|---|---|---|---|
 | B0 | 110 | 36% | 25% | 24914.94 | 20 | 20 | 30 | 3.6 |
 | B1 | 110 | 100% | 75% | 0.00 | 0 | 0 | 0 | 8.7 |
+| T | 110 | 92% | 75% | 1488.92 | 0 | 0 | 0 | 2.9 |
