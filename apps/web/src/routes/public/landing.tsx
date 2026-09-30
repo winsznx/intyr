@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from "react";
-import { Link, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { BedDouble, Car, Check, Minus, Plane, RotateCcw, Send } from "lucide-react";
 import { LivePriceTable, findRoute, formatUsdc, useLivePrices, type LivePrices } from "../../components/landing-prices";
 import { LandingSteps } from "../../components/landing-steps";
@@ -7,6 +7,8 @@ import { TripRails } from "../../components/trip-rails";
 import { ButtonLink, Chip, ComponentStateChip, TripStateChip } from "../../components/ui";
 import type { TripComponent } from "../../lib/types";
 import type { Resource } from "../../lib/use-resource";
+
+const CAMPAIGN_RESULTS_URL = "https://github.com/winsznx/intyr/blob/main/evidence/campaign-001/RESULTS.md";
 
 /** Illustrative trip for the hero frame. Captioned as an illustration, never presented as a live run. */
 const EXAMPLE_TRIP: TripComponent[] = [
@@ -98,7 +100,7 @@ function Hero({ prices }: { prices: LivePrices | undefined }) {
         <div className="lp-hero-head">
           <span className="badge">For AI agents that book trips</span>
           <h1 className="display lp-hero-title" id="lp-hero-title">
-            Book every part of the trip, or recover what failed.
+            Book every part of the trip, or undo what can be undone.
           </h1>
           <p className="body-l lp-hero-sub">
             Intyr prepares each flight, hotel and transfer an AI agent wants, checks it before money moves, commits only inside the limits you set and
@@ -218,10 +220,11 @@ function Problem() {
         <p className="lp-footnote">
           These failures come from documented supplier behavior: lost responses, failures reported later, a reply that claims a booking that does not
           exist, and blind retries that book twice. The{" "}
-          <Link className="link" to="/evidence">
-            evidence page
-          </Link>{" "}
-          shows a naive agent running into each of them in a seeded simulator.
+          <a className="link" href={CAMPAIGN_RESULTS_URL} target="_blank" rel="noreferrer">
+            campaign results
+            <span className="visually-hidden"> (opens in a new tab)</span>
+          </a>{" "}
+          show a naive agent running into each of them in a seeded simulator.
         </p>
       </div>
     </section>
@@ -240,11 +243,96 @@ function HowItWorks() {
             </h2>
           </div>
           <p className="body-l">
-            Intyr gives an agent the commit and recovery behavior a careful engineer would write, as paid x402 calls. Each step returns a decision the
-            agent can branch on and a signed receipt.
+            Intyr gives an agent the commit and recovery behavior a careful engineer would write, as paid x402 calls, and matched such a script in
+            ten of eleven campaign cells. Each step returns a decision the agent can branch on and a signed receipt.
           </p>
         </div>
         <LandingSteps />
+      </div>
+    </section>
+  );
+}
+
+/** Figures from evidence/campaign-001/RESULTS.md. The claim is the narrowed one that document states, quoted as written. */
+const CAMPAIGN_ARMS = [
+  { name: "Naive agent", duplicates: "20", work: "3.6 supplier calls per trip", consistent: "36%" },
+  { name: "Careful script", duplicates: "0", work: "8.7 supplier calls per trip, and 431 lines of the caller's own code", consistent: "100%" },
+  { name: "Intyr", duplicates: "0", work: "2.9 calls to Intyr per trip", consistent: "92%" },
+];
+
+function Results() {
+  return (
+    <section className="section" aria-labelledby="lp-results-title">
+      <div className="container">
+        <div className="section-head">
+          <div className="lp-head-main">
+            <span className="badge">Measured</span>
+            <h2 className="h2" id="lp-results-title">
+              It matched a careful script in ten of eleven cells and lost one
+            </h2>
+          </div>
+          <p className="body-l">
+            Under ten documented supplier fault patterns, a naive agent leaves bookings stranded or duplicated in most runs. A careful engineer's script
+            avoids that. Intyr provides the same careful behaviour as one paid call per step, 2.9 calls per trip from the caller's side, with signed
+            manifests and decision records, and it matched that script in ten of eleven cells and lost one.
+          </p>
+        </div>
+
+        <div className="lp-prices">
+          <div className="lp-prices-head">
+            <p className="lp-prices-title">Campaign 001, 110 runs per approach on the seeded simulator</p>
+          </div>
+          <div className="lp-prices-body">
+            <table className="lp-price-table">
+              <thead>
+                <tr>
+                  <th scope="col">Approach</th>
+                  <th scope="col">Duplicate orders</th>
+                  <th scope="col">Work for the caller</th>
+                  <th scope="col" className="lp-pt-price">
+                    Consistent end state
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {CAMPAIGN_ARMS.map((arm) => (
+                  <tr key={arm.name}>
+                    <td className="lp-pt-call">
+                      <span className="lp-pt-name">{arm.name}</span>
+                    </td>
+                    <td className="lp-pt-returns" data-label="Duplicate orders">
+                      {arm.duplicates}
+                    </td>
+                    <td className="lp-pt-fee" data-label="Work for the caller">
+                      {arm.work}
+                    </td>
+                    <td className="lp-pt-price" data-label="Consistent">
+                      {arm.consistent}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="lp-prices-note">
+            A consistent end state means every leg ended fully booked or fully unwound, as read from the simulator's own order list. The campaign was
+            pre-registered in the repository before any run.
+          </p>
+        </div>
+
+        <article className="soft-card lp-card lp-results-loss">
+          <h3 className="title-s">The cell Intyr lost</h3>
+          <p className="body">
+            The hotel accepted the booking and then refused every cancellation, and the flight was refused. Nothing in either quote said the hotel could
+            not be cancelled, so Intyr booked the cheaper hotel first. 9 of 10 runs ended <code>RECOVERY_FAILED</code> with the hotel still booked,
+            and Intyr reported the stranded hotel each time. The script booked the flight first and stranded nothing.{" "}
+            <a className="link" href={CAMPAIGN_RESULTS_URL} target="_blank" rel="noreferrer">
+              Read the full results
+              <span className="visually-hidden"> (opens in a new tab)</span>
+            </a>
+            .
+          </p>
+        </article>
       </div>
     </section>
   );
@@ -357,6 +445,10 @@ const LIMITS = [
     text: "Supplier calls run against test modes and the simulator, so no ticket, room or ride is issued to anyone.",
   },
   {
+    lead: "Commit order is a tie-break",
+    text: "When no leg is marked as impossible to undo, Intyr commits the leg that expires first, then the cheaper one. If that leg later refuses to cancel, it stays booked, and the trip ends RECOVERY_FAILED naming it.",
+  },
+  {
     lead: "No insurance or bond",
     text: "Assurance mode is none. Intyr lowers the chance and size of a partial booking and underwrites nothing when one happens.",
   },
@@ -434,6 +526,7 @@ export function LandingPage() {
       <Hero prices={prices.data} />
       <Problem />
       <HowItWorks />
+      <Results />
       <Proof />
       <Pricing prices={prices} />
       <Limits />

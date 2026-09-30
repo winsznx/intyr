@@ -44,14 +44,16 @@ export function EvidenceIndexPage() {
         <h1 className="h2">The record behind the claims</h1>
         <div className="pf-lede">
           <p className="body-l">
-            The evidence bundle is the published record behind Intyr's claims. RUN-001 is the canonical run, one agent trip taken end to end with real
-            x402 payments in USDC and manifest anchors on Algorand that anyone can look up.
+            The evidence bundle is the published record behind Intyr's claims. RUN-001 is a paid call on Algorand Mainnet: a caller paid for a trip
+            check in USDC over x402, and Intyr returned a signed commit plan anchored on Algorand. The team paid it from its own wallet, so it is
+            labeled INTERNAL_VALIDATION and is not outside adoption.
           </p>
           <p className="body">
-            campaign-001 is a TestNet campaign on the seeded simulator. A naive agent, an independently written script and Intyr face the same supplier
-            faults, and each run is kept with its result. Suppliers in both are sandbox or simulated.
+            campaign-001 is a pre-registered campaign on the seeded simulator. A naive agent, an independently written script and Intyr face the same
+            supplier faults, and each run is kept with its result. Intyr matched the script in ten of eleven cells and lost one. Suppliers in both are
+            sandbox or simulated.
           </p>
-          <p className="body">Every figure on this page comes from the API. A record that is not published yet says so.</p>
+          <p className="body">Figures come from the API. Where the API does not serve a record yet, the card says so and links the results committed in the repository.</p>
         </div>
       </header>
 
@@ -59,13 +61,8 @@ export function EvidenceIndexPage() {
         <EvidenceCard
           runId="RUN-001"
           title="Canonical run"
-          summary="One trip from payment to final manifest, with payment and anchor transactions you can open in an explorer."
-          notFound={
-            <div className="pf-ev-empty">
-              <p className="pf-ev-empty-title">Not published yet</p>
-              <p className="small muted">The API has no record for RUN-001 yet. This card fills in once it is published.</p>
-            </div>
-          }
+          summary="A paid Mainnet check: the USDC payment and the signed, anchored commit plan it bought."
+          notFound={<Run001Links />}
         />
         <EvidenceCard
           runId="campaign-001"
@@ -74,9 +71,13 @@ export function EvidenceIndexPage() {
           notFound={
             <div className="pf-ev-empty">
               <p className="pf-ev-empty-title">Results are in the repository</p>
-              <p className="small muted">The API does not serve this campaign yet. Its summary is committed with the code. Suppliers in it are the seeded simulator.</p>
-              <a className="pf-ext" href={CAMPAIGN_SUMMARY_URL} target="_blank" rel="noreferrer">
-                Read the campaign summary on GitHub
+              <p className="small muted">
+                110 runs per approach on the seeded simulator. The naive agent ended consistent in 36% of runs with 20 duplicate orders, the script in
+                100%, and Intyr in 92% with no duplicates. Intyr lost one cell, where a hotel refused every cancellation, and reported the stranded hotel
+                each time. The API does not serve this campaign yet.
+              </p>
+              <a className="pf-ext" href={CAMPAIGN_RESULTS_URL} target="_blank" rel="noreferrer">
+                Read the campaign results on GitHub
                 <ArrowUpRight aria-hidden />
                 <span className="visually-hidden"> (opens in a new tab)</span>
               </a>
@@ -88,7 +89,29 @@ export function EvidenceIndexPage() {
   );
 }
 
-const CAMPAIGN_SUMMARY_URL = "https://github.com/winsznx/intyr/blob/main/evidence/campaign-001/SUMMARY.md";
+const CAMPAIGN_RESULTS_URL = "https://github.com/winsznx/intyr/blob/main/evidence/campaign-001/RESULTS.md";
+
+const RUN_001 = {
+  planId: "pln_357c45b828fabcb25b5e271e",
+  paymentTxUrl: "https://allo.info/tx/2MD7RMXDHTLVE76ZNTAOZKZCYEPLF7AIBBOAGZQEO6JOFQLNLVPA",
+};
+
+/** The API serves no evidence route for RUN-001, so the card links the records that exist: the plan and its payment. */
+function Run001Links() {
+  return (
+    <div className="pf-ev-empty">
+      <p className="small muted">The API does not serve an evidence record for this run. Its plan and payment are public on their own.</p>
+      <Link className="pf-ext" to={`/verify/${RUN_001.planId}`}>
+        RUN-001, Mainnet, team-paid, INTERNAL_VALIDATION
+      </Link>
+      <a className="pf-ext" href={RUN_001.paymentTxUrl} target="_blank" rel="noreferrer">
+        The USDC payment on Algorand Mainnet
+        <ArrowUpRight aria-hidden />
+        <span className="visually-hidden"> (opens in a new tab)</span>
+      </a>
+    </div>
+  );
+}
 
 function EvidenceCard({ runId, title, summary, notFound }: { runId: string; title: string; summary: string; notFound: ReactNode }) {
   const run = useEvidenceRun(runId);
@@ -224,8 +247,9 @@ export function EvidenceRunPage() {
           </span>
           <h1 className="title-m">{runId} is not published yet</h1>
           <p className="body">The API has no evidence record with this id. Published runs are listed on the evidence page.</p>
+          {runId === "RUN-001" ? <Run001Links /> : null}
           {runId === "campaign-001" ? (
-            <a className="pf-ext" href={CAMPAIGN_SUMMARY_URL} target="_blank" rel="noreferrer">
+            <a className="pf-ext" href={CAMPAIGN_RESULTS_URL} target="_blank" rel="noreferrer">
               Results are in the repository, run on the seeded simulator
               <ArrowUpRight aria-hidden />
               <span className="visually-hidden"> (opens in a new tab)</span>

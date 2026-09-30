@@ -8,10 +8,10 @@ Screenshots of live sandbox runs of every demo scenario are in [docs/evidence/ui
 
 | Route | Who it is for | What it shows |
 |---|---|---|
-| `/` | Anyone evaluating Intyr | What Intyr does, how check, prepare, commit and recover work, what a receipt proves and what it does not, live prices read from the API, and the limits of this release |
+| `/` | Anyone evaluating Intyr | What Intyr does, how check, prepare, commit and recover work, the campaign result (it matched a careful script in ten of eleven cells and lost one), what a receipt proves and what it does not, live prices read from the API, and the limits of this release |
 | `/docs/quickstart` | Agent developers | Discovery files, a `POST /v1/trips/check` example, the 402 challenge, a TypeScript client using `@x402/fetch` and `@x402/avm`, how to read `payment_state`, and the decision outcomes |
 | `/verify`, `/verify/:manifestId` | Anyone holding a manifest id or file | The proof page: claim sentence, proof state, the checks that ran, what the record proves and what it does not, environment and supplier labels, anchors, signing key, and a command to rerun verification |
-| `/evidence`, `/evidence/:runId` | Reviewers | The canonical run and the TestNet campaign, or an honest "not published yet" when a run does not exist |
+| `/evidence`, `/evidence/:runId` | Reviewers | RUN-001, a team-paid Mainnet check labeled `INTERNAL_VALIDATION`, linked to its plan and payment, and the campaign results committed in `evidence/campaign-001/RESULTS.md` |
 | `/replay/:runId` | Presenters | A recorded run stepped through under a fixed "Captured, not live" banner |
 | `/app` | The sandbox session holder | The trips queue. Work that needs a person comes first, then work in progress, then finished trips. There are no stat tiles or charts |
 | `/app/trips/new` | The sandbox session holder | Prepare a trip through Duffel test mode and the LiteAPI sandbox (priced in EUR), or check offers an agent already found without calling any supplier |

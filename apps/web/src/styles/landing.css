@@ -407,7 +407,7 @@
   margin-top: 12px;
 }
 
-/* Live price list, shared by the landing page and the quickstart */
+/* Data tables: the live price list (landing page and quickstart) and the campaign results */
 .lp-prices {
   padding: 8px;
   border-radius: var(--r-32);
@@ -508,6 +508,10 @@
 
 .lp-price-table td.lp-pt-price .skeleton {
   margin-left: auto;
+}
+
+.lp-results-loss {
+  margin-top: 24px;
 }
 
 .lp-skeleton-lines {
@@ -791,6 +795,14 @@
     content: attr(data-label);
     display: block;
     margin-bottom: 2px;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .lp-price-table td.lp-pt-price[data-label]::before {
+    content: attr(data-label);
+    margin-right: 6px;
+    font-family: var(--font-sans);
     font-size: 12px;
     color: var(--ink-3);
   }
