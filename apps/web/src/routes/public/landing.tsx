@@ -349,7 +349,7 @@ function Pricing({ prices }: { prices: Resource<LivePrices> }) {
 const LIMITS = [
   {
     lead: "Test-mode and simulated suppliers",
-    text: "Flights come from Duffel and hotels from LiteAPI, both in test mode. Transfers and every injected failure come from a seeded simulator.",
+    text: "The demo failures run on a seeded simulator. Real Duffel and LiteAPI test-mode offers can be prepared and revalidated, and their readiness is below the commit threshold, so Intyr refuses to commit them in this release.",
   },
   {
     lead: "No actual travel is booked",

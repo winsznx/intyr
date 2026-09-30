@@ -64,6 +64,7 @@ interface Fields {
   to: string;
   pickupAt: string;
   budget: string;
+  currency: "EUR" | "USD";
   maxMove: string;
 }
 
@@ -85,6 +86,7 @@ const INITIAL: Fields = {
   to: "Lisbon Alfama",
   pickupAt: `${isoDate(21)}T14:30`,
   budget: "2500",
+  currency: "EUR",
   maxMove: "2",
 };
 
@@ -123,7 +125,7 @@ function toIntent(f: Fields): TripIntent {
   const budgetMinor = Math.round(Number(f.budget) * 100);
   return {
     ...(f.tripRef.trim() ? { trip_ref: f.tripRef.trim() } : {}),
-    currency: "USD",
+    currency: f.currency,
     budget_total_minor: budgetMinor,
     components,
     limits: { max_total_minor: budgetMinor, max_price_move_pct: Number(f.maxMove) },
@@ -199,8 +201,9 @@ export function NewTripPage() {
         {mode === "prepare" ? (
           <>
             <Notice kind="info" title="Supplier test mode.">
-              Flights come from Duffel in test mode and hotels from LiteAPI's sandbox. Ground transfers use a simulator, because no ground supplier offers a
-              sandbox without a contract. Every leg is labeled with where it came from.
+              Flights come from Duffel in test mode and hotels from LiteAPI's sandbox, priced in EUR. Ground transfers use a simulator, because no ground
+              supplier offers a sandbox without a contract. You can prepare and revalidate these offers. Their readiness is below the commit threshold in
+              this release, so Intyr refuses to commit them and says why. The failure scenarios on the demo page run on the simulator.
             </Notice>
             {show("components") ? <p className="field-error">{errors.components}</p> : null}
 
@@ -283,7 +286,7 @@ export function NewTripPage() {
             <fieldset className="card form-card">
               <legend className="card-title">Limits</legend>
               <div className="form-grid">
-                <Field label="Budget in USD" error={show("budget")} hint="Intyr refuses to commit above this.">
+                <Field label={`Budget in ${fields.currency}`} error={show("budget")} hint="Intyr refuses to commit above this. Duffel's test mode prices in EUR.">
                   <input className="input" inputMode="decimal" value={fields.budget} onChange={(e) => set("budget", e.target.value)} aria-invalid={Boolean(show("budget"))} />
                 </Field>
                 <Field label="Largest price move allowed, in percent" error={show("maxMove")} hint="A bigger move needs a recheck and an approval.">

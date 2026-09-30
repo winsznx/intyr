@@ -66,8 +66,15 @@ function isoDate(daysFromNow: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Builds the prepare request for a preset. The seed is fixed per preset so reruns see the same faults. */
-export function scenarioIntent(preset: ScenarioPreset, seed: number): TripIntent {
+/** A fresh seed per run. The simulator keeps state per seed, so two visitors on one seed would overwrite each other's offers. */
+export function freshSeed(): number {
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  return (value[0] ?? 1) % 2 ** 31;
+}
+
+/** Builds the prepare request for a preset. The faults come from the preset, the seed only isolates the run. */
+export function scenarioIntent(preset: ScenarioPreset, seed: number = freshSeed()): TripIntent {
   const depart = isoDate(21);
   const checkout = isoDate(24);
   return {

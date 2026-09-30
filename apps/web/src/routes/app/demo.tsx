@@ -7,8 +7,6 @@ import { api } from "../../lib/api";
 import { SCENARIOS, scenarioIntent, type ScenarioPreset } from "../../lib/scenarios";
 import { useResource } from "../../lib/use-resource";
 
-const SEED = 4021;
-
 /** Plain-language setup for the scenarios the server runs end to end. Unknown ids fall back to the server label. */
 const SERVER_SCENARIO_TEXT: Record<string, { setup: string; expect: string }> = {
   happy: {
@@ -21,7 +19,7 @@ const SERVER_SCENARIO_TEXT: Record<string, { setup: string; expect: string }> = 
   },
   "timeout-hotel": {
     setup: "The hotel booking times out, and the hotel did create the booking.",
-    expect: "The hotel is marked unknown and never retried. A later read finds the booking and the trip becomes committed.",
+    expect: "The hotel is marked unknown and never retried. About a minute later a supplier read finds the booking and the trip becomes committed. Keep the trip page open to watch it change.",
   },
   "refuse-irreversible": {
     setup: "One leg cannot be cancelled or refunded, and it is priced above the limit for money that cannot be undone.",
@@ -52,7 +50,7 @@ export function DemoPage() {
     setBusy(`prep:${preset.id}`);
     setOutcome(null);
     try {
-      const response = await api.prepareTrip(scenarioIntent(preset, SEED));
+      const response = await api.prepareTrip(scenarioIntent(preset));
       const tripId = response.trip_id ?? response.trip?.trip_id;
       if (tripId) {
         navigate(`/app/trips/${tripId}`);
