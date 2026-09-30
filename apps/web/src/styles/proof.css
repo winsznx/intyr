@@ -1076,3 +1076,28 @@
     padding-top: 4px;
   }
 }
+
+/* In-browser check, shown above the server result */
+.pf-browser {
+  display: grid;
+  gap: 10px;
+}
+
+.pf-browser .pf-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pf-browser .pf-panel-title svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pf-browser-facts {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+  list-style: disc;
+  color: var(--ink-2);
+}

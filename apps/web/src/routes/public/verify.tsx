@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { ApiError, PUBLIC, SANDBOX, api, type ApiErrorBody } from "../../lib/api";
+import { BrowserProofPanel, browserOverride, useBrowserProof, type StoredManifest } from "../../components/browser-proof-panel";
 import { COMPONENT_TYPE, PROOF_STATE, describeReason, type Tone } from "../../lib/labels";
 import { shortId } from "../../lib/format";
 import type { Environment, ProofState, VerifyResult } from "../../lib/types";
@@ -326,6 +327,9 @@ function verifyCommand(body: string, base: string = PUBLIC): string {
 function ManifestProofPage({ manifestId }: { manifestId: string }) {
   const manifest = useResource(`manifest:${manifestId}`, (signal) => loadManifest(manifestId, signal));
   const verification = useResource(`verify:${manifestId}`, () => api.verifyAnywhere({ manifest_id: manifestId }));
+  const browser = useBrowserProof(manifestId, manifest.data?.doc as StoredManifest | undefined);
+  const override = browserOverride(browser.data);
+  const shownVerification = override && verification.data ? { ...verification, data: { ...verification.data, proof_state: override } } : verification;
   const view = readManifest(manifest.data?.doc);
   const rawHref = manifest.data?.path ?? `${PUBLIC}/manifests/${encodeURIComponent(manifestId)}`;
 
@@ -412,9 +416,10 @@ function ManifestProofPage({ manifestId }: { manifestId: string }) {
           </Notice>
         ) : null}
       </header>
+      <BrowserProofPanel proof={browser} />
       <ProofReport
         view={view}
-        verification={verification}
+        verification={shownVerification}
         onRecheck={verification.reload}
         rawHref={rawHref}
         command={verifyCommand(JSON.stringify({ manifest_id: manifestId }), verification.data?.answered_by)}
