@@ -21,6 +21,8 @@ export interface Env {
   PAYTO_MNEMONIC_TESTNET?: string;
   /** Milliseconds a request waits for its anchor to confirm before leaving it PENDING for the cron. Default 6000. */
   ANCHOR_CONFIRM_WAIT_MS?: string;
+  /** Short git SHA the Worker was deployed from, with -dirty when the tree had uncommitted changes. Set by scripts/deploy.sh. */
+  GIT_COMMIT?: string;
   DUFFEL_TOKEN?: string;
   LITEAPI_KEY?: string;
 }

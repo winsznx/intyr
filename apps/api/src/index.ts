@@ -7,7 +7,7 @@ import { createApp, type NetworkDeps } from "./app";
 import { createDomain, type Domain } from "./domain/wire";
 import { openFeeRefund, reconcileRefunds, summarize } from "./payments/refunds";
 
-const VERSION = { name: "intyr", commit: "dev", contract_versions: { manifest: "v1" } };
+const VERSION = { name: "intyr", contract_versions: { manifest: "v1" } };
 
 function buildNetwork(env: Env, name: "mainnet" | "testnet", payTo: string) {
   const net = networkConfig(name, env);
@@ -31,7 +31,7 @@ function buildNetwork(env: Env, name: "mainnet" | "testnet", payTo: string) {
 function build(env: Env) {
   const mainnet = env.PAY_TO_MAINNET ? buildNetwork(env, "mainnet", env.PAY_TO_MAINNET) : undefined;
   const testnet = env.PAY_TO_TESTNET ? buildNetwork(env, "testnet", env.PAY_TO_TESTNET) : undefined;
-  const app = createApp({ env, mainnet: mainnet?.deps, testnet: testnet?.deps, version: VERSION });
+  const app = createApp({ env, mainnet: mainnet?.deps, testnet: testnet?.deps, version: { ...VERSION, commit: env.GIT_COMMIT ?? "dev" } });
   const nets: NetworkConfig[] = [mainnet?.net, testnet?.net].filter((n): n is NetworkConfig => Boolean(n));
   // A promise created in one request cannot be awaited from another in workerd, so initialization is
   // retried inside whichever request needs it. The resource server keeps the result as plain data.
