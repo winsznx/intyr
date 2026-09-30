@@ -71,7 +71,7 @@ export function signingKeyFromJwkJson(keyId: string, privateJwkJson: string): Si
   if (jwk.kty !== "OKP" || jwk.crv !== "Ed25519" || !jwk.d || !jwk.x) {
     throw new TypeError("signingKeyFromJwkJson: expected a private Ed25519 JWK with d and x");
   }
-  return { keyId, privateJwk: bareJwk(jwk), publicJwk: bareJwk({ x: jwk.x }) };
+  return { keyId, privateJwk: bareJwk(jwk), publicJwk: bareJwk({ kty: "OKP", x: jwk.x }) };
 }
 
 export function publicKeyOf(key: SigningKey): string {
