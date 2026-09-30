@@ -91,13 +91,13 @@ const ApproveBodySchema = z.object({
 });
 
 export const DEMO_SCENARIOS = {
-  happy: { label: "Everything confirms", faults: [] as Array<{ component_index: number; fault: string }> },
-  "rejected-flight": { label: "The flight is rejected after the hotel and transfer confirmed", faults: [{ component_index: 1, fault: "COMMIT_REJECT" }] },
-  "timeout-hotel": { label: "The hotel times out: booked or not, unknown", faults: [{ component_index: 0, fault: "TIMEOUT_BOOKED" }] },
-  "irreversible-last": { label: "A non-refundable flight is held back while another leg is rejected", faults: [{ component_index: 1, fault: "NON_REFUNDABLE" }, { component_index: 0, fault: "COMMIT_REJECT" }] },
+  happy: { label: "Everything confirms", min_readiness: 30, faults: [] as Array<{ component_index: number; fault: string }> },
+  "rejected-flight": { label: "The flight is rejected after the hotel and transfer confirmed", min_readiness: 30, faults: [{ component_index: 1, fault: "COMMIT_REJECT" }] },
+  "timeout-hotel": { label: "The hotel times out: booked or not, unknown", min_readiness: 30, faults: [{ component_index: 0, fault: "TIMEOUT_BOOKED" }] },
+  "refuse-irreversible": { label: "A non-refundable flight drops readiness below the threshold: Intyr refuses and books nothing", min_readiness: 30, faults: [{ component_index: 1, fault: "NON_REFUNDABLE" }] },
 } as const;
 
-const DEMO_IDS = ["happy", "rejected-flight", "timeout-hotel", "irreversible-last"] as const;
+const DEMO_IDS = ["happy", "rejected-flight", "timeout-hotel", "refuse-irreversible"] as const;
 
 const DemoBodySchema = z.object({
   scenario: z.enum(DEMO_IDS).default("rejected-flight"),
@@ -161,7 +161,7 @@ export function mountSandboxActions(app: Hono<{ Bindings: Env }>, deps: { db: D1
         { type: "FLIGHT", origin: "JFK", destination: "LHR", depart_date: "2026-11-01", passengers: 1 },
         { type: "GROUND", from: "LHR", to: "Central London", pickup_at: "2026-11-01T18:00:00Z", passengers: 1 },
       ],
-      limits: { min_readiness: 30 },
+      limits: { min_readiness: DEMO_SCENARIOS[scenario].min_readiness },
       scenario: { seed, faults: DEMO_SCENARIOS[scenario].faults },
     };
     const p = parseIntent(intent);
