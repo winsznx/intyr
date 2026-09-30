@@ -1,0 +1,417 @@
+
+== duffel prepare
+{
+  "component_id": "flight-1",
+  "type": "FLIGHT",
+  "adapter_id": "duffel-flights",
+  "provider_id": "duffel",
+  "adapter_version": "1.0.0",
+  "leg_class": "SUPPLIER_SANDBOX",
+  "evidence_grade": "SUPPLIER_SANDBOX",
+  "supplier_environment": "TEST",
+  "preparation_mode": "REVALIDATED",
+  "refs": {
+    "offer_id": "off_0000BAwp2oFGCJA59cqhlw",
+    "hold_order_id": null,
+    "prebook_id": null,
+    "booking_id": null,
+    "booking_reference": null,
+    "passenger_ids": [
+      "pas_0000BAwp2nuhQkiO7rEHiV"
+    ]
+  },
+  "price": {
+    "amount_minor": 3119,
+    "currency": "EUR"
+  },
+  "clocks": {
+    "price_valid_until": "2026-09-30T22:29:17.035821Z",
+    "inventory_held_until": null,
+    "free_cancel_until": null,
+    "void_until": null,
+    "refund_destination": "NONE",
+    "refund_amount_certainty": "QUOTED",
+    "confirmation_mode": "INSTANT",
+    "supplier_can_cancel": true
+  },
+  "irreversible": true,
+  "summary": "Flight JFK to EWR on 2026-10-30",
+  "untrusted_notes": [
+    "Duffel Airways"
+  ],
+  "prepared_at": "2026-09-30T21:59:17.986Z",
+  "request_hash": "sha256:ff149fab6b6ef9e774d0bc1d6f5e9d171c8ed6aeeb948f89636abe60dbdf46bc",
+  "response_hash": "sha256:3efe55030a5bc532cb34f7ce44dcbc0b48fc043f70af6b0d915563b25c161383",
+  "sim": null
+}
+
+== duffel-flights revalidate
+{
+  "status": "UNCHANGED",
+  "leg": {
+    "component_id": "flight-1",
+    "type": "FLIGHT",
+    "adapter_id": "duffel-flights",
+    "provider_id": "duffel",
+    "adapter_version": "1.0.0",
+    "leg_class": "SUPPLIER_SANDBOX",
+    "evidence_grade": "SUPPLIER_SANDBOX",
+    "supplier_environment": "TEST",
+    "preparation_mode": "REVALIDATED",
+    "refs": {
+      "offer_id": "off_0000BAwp2oFGCJA59cqhlw",
+      "hold_order_id": null,
+      "prebook_id": null,
+      "booking_id": null,
+      "booking_reference": null,
+      "passenger_ids": [
+        "pas_0000BAwp2nuhQkiO7rEHiV"
+      ]
+    },
+    "price": {
+      "amount_minor": 3119,
+      "currency": "EUR"
+    },
+    "clocks": {
+      "price_valid_until": "2026-09-30T22:29:17.035821Z",
+      "inventory_held_until": null,
+      "free_cancel_until": null,
+      "void_until": null,
+      "refund_destination": "NONE",
+      "refund_amount_certainty": "QUOTED",
+      "confirmation_mode": "INSTANT",
+      "supplier_can_cancel": true
+    },
+    "irreversible": true,
+    "summary": "Flight JFK to EWR on 2026-10-30",
+    "untrusted_notes": [
+      "Duffel Airways"
+    ],
+    "prepared_at": "2026-09-30T21:59:17.986Z",
+    "request_hash": "sha256:ff149fab6b6ef9e774d0bc1d6f5e9d171c8ed6aeeb948f89636abe60dbdf46bc",
+    "response_hash": "sha256:3efe55030a5bc532cb34f7ce44dcbc0b48fc043f70af6b0d915563b25c161383",
+    "sim": null
+  },
+  "previous_price": {
+    "amount_minor": 3119,
+    "currency": "EUR"
+  },
+  "checked_at": "2026-09-30T21:59:17.988Z",
+  "response_hash": "sha256:a2e52b69829ff639590751191790bcf82b39bda3142899510c271ac12224f0da",
+  "detail": null
+}
+
+== duffel-flights commit
+{
+  "refs": {
+    "offer_id": "off_0000BAwp2oFGCJA59cqhlw",
+    "hold_order_id": null,
+    "prebook_id": null,
+    "booking_id": "ord_0000BAwp2wZlDyJUzWVBpI",
+    "booking_reference": "RPUZZG",
+    "passenger_ids": [
+      "pas_0000BAwp2nuhQkiO7rEHiV"
+    ]
+  },
+  "price": {
+    "amount_minor": 3119,
+    "currency": "EUR"
+  },
+  "supplier_status": "ORDER_CREATED",
+  "responded_at": "2026-09-30T21:59:18.698Z",
+  "response_hash": "sha256:79784a0bebb4530f2b88962b91f22fe45c21f9fc5bab9a1d9eb5db0e65b8f2d7",
+  "response": "RESPONDED_CONFIRMED",
+  "no_booking_certain": false,
+  "error_code": null,
+  "detail": null
+}
+
+== duffel-flights postcondition
+{
+  "found": "PRESENT",
+  "confirmed": true,
+  "cancelled": false,
+  "refs": {
+    "offer_id": "off_0000BAwp2oFGCJA59cqhlw",
+    "hold_order_id": null,
+    "prebook_id": null,
+    "booking_id": "ord_0000BAwp2wZlDyJUzWVBpI",
+    "booking_reference": "RPUZZG",
+    "passenger_ids": [
+      "pas_0000BAwp2nuhQkiO7rEHiV"
+    ]
+  },
+  "price": {
+    "amount_minor": 3119,
+    "currency": "EUR"
+  },
+  "supplier_status": "TICKETED_OR_CONFIRMED",
+  "absent_is_final": false,
+  "evidence_tier": "E1",
+  "read_at": "2026-09-30T21:59:18.926Z",
+  "response_hash": "sha256:79784a0bebb4530f2b88962b91f22fe45c21f9fc5bab9a1d9eb5db0e65b8f2d7",
+  "detail": null
+}
+
+== duffel-flights cancel quote
+{
+  "refund": {
+    "amount_minor": 3119,
+    "currency": "EUR"
+  },
+  "fee": null,
+  "refund_destination": "CASH",
+  "certainty": "QUOTED",
+  "valid_until": "2026-09-30T22:59:19Z",
+  "cancellable": true,
+  "detail": "refund_to=balance"
+}
+
+== duffel-flights cancel
+{
+  "outcome": "CANCELLED",
+  "refund": {
+    "amount_minor": 3119,
+    "currency": "EUR"
+  },
+  "fee": null,
+  "refund_destination": "CASH",
+  "responded_at": "2026-09-30T21:59:19.706Z",
+  "response_hash": "sha256:8fcf2a3fe7e680a5fa505274150f435b4e8e58cb09cebc39282d7cfbdbdec384",
+  "detail": null
+}
+
+== duffel-flights postcondition after cancel
+{
+  "found": "PRESENT",
+  "confirmed": false,
+  "cancelled": true,
+  "refs": {
+    "offer_id": "off_0000BAwp2oFGCJA59cqhlw",
+    "hold_order_id": null,
+    "prebook_id": null,
+    "booking_id": "ord_0000BAwp2wZlDyJUzWVBpI",
+    "booking_reference": "RPUZZG",
+    "passenger_ids": [
+      "pas_0000BAwp2nuhQkiO7rEHiV"
+    ]
+  },
+  "price": {
+    "amount_minor": 3119,
+    "currency": "EUR"
+  },
+  "supplier_status": "CANCELLED",
+  "absent_is_final": false,
+  "evidence_tier": "E1",
+  "read_at": "2026-09-30T21:59:19.997Z",
+  "response_hash": "sha256:67d0f82eead7d0df87f83577656f35e531c8f3375f4ab4b5655732365beca471",
+  "detail": null
+}
+
+== liteapi prepare
+{
+  "ok": true,
+  "leg": {
+    "component_id": "hotel-2",
+    "type": "HOTEL",
+    "adapter_id": "liteapi-hotels",
+    "provider_id": "nuitee-liteapi",
+    "adapter_version": "1.0.0",
+    "leg_class": "SUPPLIER_SANDBOX",
+    "evidence_grade": "SUPPLIER_SANDBOX",
+    "supplier_environment": "TEST",
+    "preparation_mode": "REVALIDATED",
+    "refs": {
+      "offer_id": "3gAYonJzkd4AEaRzcmlk2gECRzRZVE9OSldHVTNES05URkdJWURPTVJXTVkzR01OVEVQUVlTR01SUUdJM0RDTUJUR0I2REVNQlNHWVlUQ01CUlBSU1c0WDJWS042RktVMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJZR0EyVElNQlpHWVpETVVER0tCM0NHTVJRR00zRE1NSkRIRTNEUUxKU0dBWlRNTlJSUFJKRU1UVDRHSVlERU5SUkdBWkRTTUpRR0FZSFlNTDRLSVlUQU5KVFBRWlRTTkpRR1FSVkVUWkRLSkRFNElaU0dBWkRNTEpSR0FXVEVPSkFHRVlEVU1CUUVNo3ByY8tAeLCj1wo9caVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0xMC0yOSAxMDowMDowMKJydKNSRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqpRVUVFTiBST09No29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkYWhdLMyMDI2LTEwLTI5IDEwOjAwOjAwoWHLQHiwo9cKPXGhY6NVU0SidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKYyMDM2NjGjc2lkAqNoaWSnbHAzMWI4ZKNvY2ORgaFhAaNjdXKjVVNEomduolVTomNpqjIwMjYtMTAtMzCiY2-qMjAyNi0xMS0wMaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMGY0NTFmZWM3TUdScXBqZkVzTU5wdzBpUTQ1UVBLTFYyc0ZHc6Npc2jCo3NzcK5wcm92aWRlckRpcmVjdKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWSjdGF4oWHLQFB1wo9cKPahY6NVU0SEoWnDoWSjdmF0oWHLQE9Cj1wo9cOhY6NVU0SibHDAo2JrdAKkbXNwYctAef-FHrhR7KRtc3Bjo1VTRA==",
+      "hold_order_id": null,
+      "prebook_id": "DVEWmvs2M",
+      "booking_id": null,
+      "booking_reference": null,
+      "passenger_ids": []
+    },
+    "price": {
+      "amount_minor": 39504,
+      "currency": "USD"
+    },
+    "clocks": {
+      "price_valid_until": "2026-09-30T22:04:23.625Z",
+      "inventory_held_until": null,
+      "free_cancel_until": "2026-10-29T10:00:00.000Z",
+      "void_until": null,
+      "refund_destination": "CASH",
+      "refund_amount_certainty": "QUOTED",
+      "confirmation_mode": "INSTANT",
+      "supplier_can_cancel": true
+    },
+    "irreversible": false,
+    "summary": "Hotel stay 2026-10-30 to 2026-11-01",
+    "untrusted_notes": [
+      "lp31b8d"
+    ],
+    "prepared_at": "2026-09-30T21:59:23.625Z",
+    "request_hash": "sha256:428786250ec71d448503885821e04da796a6fd27bd339eff01a9802cb5edcec8",
+    "response_hash": "sha256:b9a1ed02689f77e03e9239c9091c65a8de315434687f5ecd182948f23f3e2bb9",
+    "sim": null
+  }
+}
+
+== liteapi-hotels revalidate
+{
+  "status": "UNCHANGED",
+  "leg": {
+    "component_id": "hotel-2",
+    "type": "HOTEL",
+    "adapter_id": "liteapi-hotels",
+    "provider_id": "nuitee-liteapi",
+    "adapter_version": "1.0.0",
+    "leg_class": "SUPPLIER_SANDBOX",
+    "evidence_grade": "SUPPLIER_SANDBOX",
+    "supplier_environment": "TEST",
+    "preparation_mode": "REVALIDATED",
+    "refs": {
+      "offer_id": "3gAYonJzkd4AEaRzcmlk2gECRzRZVE9OSldHVTNES05URkdJWURPTVJXTVkzR01OVEVQUVlTR01SUUdJM0RDTUJUR0I2REVNQlNHWVlUQ01CUlBSU1c0WDJWS042RktVMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJZR0EyVElNQlpHWVpETVVER0tCM0NHTVJRR00zRE1NSkRIRTNEUUxKU0dBWlRNTlJSUFJKRU1UVDRHSVlERU5SUkdBWkRTTUpRR0FZSFlNTDRLSVlUQU5KVFBRWlRTTkpRR1FSVkVUWkRLSkRFNElaU0dBWkRNTEpSR0FXVEVPSkFHRVlEVU1CUUVNo3ByY8tAeLCj1wo9caVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0xMC0yOSAxMDowMDowMKJydKNSRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqpRVUVFTiBST09No29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkYWhdLMyMDI2LTEwLTI5IDEwOjAwOjAwoWHLQHiwo9cKPXGhY6NVU0SidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKYyMDM2NjGjc2lkAqNoaWSnbHAzMWI4ZKNvY2ORgaFhAaNjdXKjVVNEomduolVTomNpqjIwMjYtMTAtMzCiY2-qMjAyNi0xMS0wMaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMGY0NTFmZWM3TUdScXBqZkVzTU5wdzBpUTQ1UVBLTFYyc0ZHc6Npc2jCo3NzcK5wcm92aWRlckRpcmVjdKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWSjdGF4oWHLQFB1wo9cKPahY6NVU0SEoWnDoWSjdmF0oWHLQE9Cj1wo9cOhY6NVU0SibHDAo2JrdAKkbXNwYctAef-FHrhR7KRtc3Bjo1VTRA==",
+      "hold_order_id": null,
+      "prebook_id": "NhLkgpEna",
+      "booking_id": null,
+      "booking_reference": null,
+      "passenger_ids": []
+    },
+    "price": {
+      "amount_minor": 39504,
+      "currency": "USD"
+    },
+    "clocks": {
+      "price_valid_until": "2026-09-30T22:04:24.370Z",
+      "inventory_held_until": null,
+      "free_cancel_until": "2026-10-29T10:00:00.000Z",
+      "void_until": null,
+      "refund_destination": "CASH",
+      "refund_amount_certainty": "QUOTED",
+      "confirmation_mode": "INSTANT",
+      "supplier_can_cancel": true
+    },
+    "irreversible": false,
+    "summary": "Hotel stay 2026-10-30 to 2026-11-01",
+    "untrusted_notes": [
+      "lp31b8d"
+    ],
+    "prepared_at": "2026-09-30T21:59:23.625Z",
+    "request_hash": "sha256:428786250ec71d448503885821e04da796a6fd27bd339eff01a9802cb5edcec8",
+    "response_hash": "sha256:b9a1ed02689f77e03e9239c9091c65a8de315434687f5ecd182948f23f3e2bb9",
+    "sim": null
+  },
+  "previous_price": {
+    "amount_minor": 39504,
+    "currency": "USD"
+  },
+  "checked_at": "2026-09-30T21:59:23.626Z",
+  "response_hash": "sha256:12adc2b91e12fa871a5435ad4b0be3372f97164de13ba67f0373152e890c1a7e",
+  "detail": null
+}
+
+== liteapi-hotels commit
+{
+  "response": "RESPONDED_CONFIRMED",
+  "no_booking_certain": false,
+  "refs": {
+    "offer_id": "3gAYonJzkd4AEaRzcmlk2gECRzRZVE9OSldHVTNES05URkdJWURPTVJXTVkzR01OVEVQUVlTR01SUUdJM0RDTUJUR0I2REVNQlNHWVlUQ01CUlBSU1c0WDJWS042RktVMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJZR0EyVElNQlpHWVpETVVER0tCM0NHTVJRR00zRE1NSkRIRTNEUUxKU0dBWlRNTlJSUFJKRU1UVDRHSVlERU5SUkdBWkRTTUpRR0FZSFlNTDRLSVlUQU5KVFBRWlRTTkpRR1FSVkVUWkRLSkRFNElaU0dBWkRNTEpSR0FXVEVPSkFHRVlEVU1CUUVNo3ByY8tAeLCj1wo9caVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0xMC0yOSAxMDowMDowMKJydKNSRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqpRVUVFTiBST09No29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkYWhdLMyMDI2LTEwLTI5IDEwOjAwOjAwoWHLQHiwo9cKPXGhY6NVU0SidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKYyMDM2NjGjc2lkAqNoaWSnbHAzMWI4ZKNvY2ORgaFhAaNjdXKjVVNEomduolVTomNpqjIwMjYtMTAtMzCiY2-qMjAyNi0xMS0wMaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMGY0NTFmZWM3TUdScXBqZkVzTU5wdzBpUTQ1UVBLTFYyc0ZHc6Npc2jCo3NzcK5wcm92aWRlckRpcmVjdKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWSjdGF4oWHLQFB1wo9cKPahY6NVU0SEoWnDoWSjdmF0oWHLQE9Cj1wo9cOhY6NVU0SibHDAo2JrdAKkbXNwYctAef-FHrhR7KRtc3Bjo1VTRA==",
+    "hold_order_id": null,
+    "prebook_id": "DVEWmvs2M",
+    "booking_id": "XonL-F7MS",
+    "booking_reference": "test",
+    "passenger_ids": []
+  },
+  "price": {
+    "amount_minor": 39504,
+    "currency": "USD"
+  },
+  "supplier_status": "CONFIRMED",
+  "error_code": null,
+  "detail": null,
+  "responded_at": "2026-09-30T21:59:50.778Z",
+  "response_hash": "sha256:48939040d4bc52970215b97606e7cd40cfe3b4c397724ef5d9222b526ccadc6d"
+}
+
+== liteapi-hotels postcondition
+{
+  "found": "PRESENT",
+  "confirmed": true,
+  "cancelled": false,
+  "refs": {
+    "offer_id": "3gAYonJzkd4AEaRzcmlk2gECRzRZVE9OSldHVTNES05URkdJWURPTVJXTVkzR01OVEVQUVlTR01SUUdJM0RDTUJUR0I2REVNQlNHWVlUQ01CUlBSU1c0WDJWS042RktVMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJZR0EyVElNQlpHWVpETVVER0tCM0NHTVJRR00zRE1NSkRIRTNEUUxKU0dBWlRNTlJSUFJKRU1UVDRHSVlERU5SUkdBWkRTTUpRR0FZSFlNTDRLSVlUQU5KVFBRWlRTTkpRR1FSVkVUWkRLSkRFNElaU0dBWkRNTEpSR0FXVEVPSkFHRVlEVU1CUUVNo3ByY8tAeLCj1wo9caVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0xMC0yOSAxMDowMDowMKJydKNSRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqpRVUVFTiBST09No29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkYWhdLMyMDI2LTEwLTI5IDEwOjAwOjAwoWHLQHiwo9cKPXGhY6NVU0SidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKYyMDM2NjGjc2lkAqNoaWSnbHAzMWI4ZKNvY2ORgaFhAaNjdXKjVVNEomduolVTomNpqjIwMjYtMTAtMzCiY2-qMjAyNi0xMS0wMaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMGY0NTFmZWM3TUdScXBqZkVzTU5wdzBpUTQ1UVBLTFYyc0ZHc6Npc2jCo3NzcK5wcm92aWRlckRpcmVjdKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWSjdGF4oWHLQFB1wo9cKPahY6NVU0SEoWnDoWSjdmF0oWHLQE9Cj1wo9cOhY6NVU0SibHDAo2JrdAKkbXNwYctAef-FHrhR7KRtc3Bjo1VTRA==",
+    "hold_order_id": null,
+    "prebook_id": "DVEWmvs2M",
+    "booking_id": "XonL-F7MS",
+    "booking_reference": "test",
+    "passenger_ids": []
+  },
+  "price": {
+    "amount_minor": 39504,
+    "currency": "USD"
+  },
+  "supplier_status": "CONFIRMED",
+  "absent_is_final": false,
+  "evidence_tier": "E1",
+  "read_at": "2026-09-30T21:59:51.420Z",
+  "response_hash": "sha256:35818f9e6e6b6deaa8435a5dbfe04e352edb2748995b877155b5efffdb395183",
+  "detail": null
+}
+
+== liteapi-hotels cancel quote
+{
+  "refund": {
+    "amount_minor": 39504,
+    "currency": "USD"
+  },
+  "fee": {
+    "amount_minor": 0,
+    "currency": "USD"
+  },
+  "refund_destination": "CASH",
+  "certainty": "ESTIMATED",
+  "valid_until": "2026-10-29T10:00:00.000Z",
+  "cancellable": true,
+  "detail": "computed from the rate cancellation policy; the supplier states the final amount on cancel"
+}
+
+== liteapi-hotels cancel
+{
+  "outcome": "CANCELLED",
+  "refund": {
+    "amount_minor": 39504,
+    "currency": "USD"
+  },
+  "fee": {
+    "amount_minor": 0,
+    "currency": "USD"
+  },
+  "refund_destination": "CASH",
+  "responded_at": "2026-09-30T21:59:51.856Z",
+  "response_hash": "sha256:37cc47663afafb7818354092ad41a69650ecc2ffc9c6fb9d4e8f909855b2f10f",
+  "detail": null
+}
+
+== liteapi-hotels postcondition after cancel
+{
+  "found": "PRESENT",
+  "confirmed": false,
+  "cancelled": true,
+  "refs": {
+    "offer_id": "3gAYonJzkd4AEaRzcmlk2gECRzRZVE9OSldHVTNES05URkdJWURPTVJXTVkzR01OVEVQUVlTR01SUUdJM0RDTUJUR0I2REVNQlNHWVlUQ01CUlBSU1c0WDJWS042RktVMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJZR0EyVElNQlpHWVpETVVER0tCM0NHTVJRR00zRE1NSkRIRTNEUUxKU0dBWlRNTlJSUFJKRU1UVDRHSVlERU5SUkdBWkRTTUpRR0FZSFlNTDRLSVlUQU5KVFBRWlRTTkpRR1FSVkVUWkRLSkRFNElaU0dBWkRNTEpSR0FXVEVPSkFHRVlEVU1CUUVNo3ByY8tAeLCj1wo9caVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0xMC0yOSAxMDowMDowMKJydKNSRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqpRVUVFTiBST09No29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkYWhdLMyMDI2LTEwLTI5IDEwOjAwOjAwoWHLQHiwo9cKPXGhY6NVU0SidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKYyMDM2NjGjc2lkAqNoaWSnbHAzMWI4ZKNvY2ORgaFhAaNjdXKjVVNEomduolVTomNpqjIwMjYtMTAtMzCiY2-qMjAyNi0xMS0wMaNnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMGY0NTFmZWM3TUdScXBqZkVzTU5wdzBpUTQ1UVBLTFYyc0ZHc6Npc2jCo3NzcK5wcm92aWRlckRpcmVjdKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkoKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWSjdGF4oWHLQFB1wo9cKPahY6NVU0SEoWnDoWSjdmF0oWHLQE9Cj1wo9cOhY6NVU0SibHDAo2JrdAKkbXNwYctAef-FHrhR7KRtc3Bjo1VTRA==",
+    "hold_order_id": null,
+    "prebook_id": "DVEWmvs2M",
+    "booking_id": "XonL-F7MS",
+    "booking_reference": "test",
+    "passenger_ids": []
+  },
+  "price": {
+    "amount_minor": 39504,
+    "currency": "USD"
+  },
+  "supplier_status": "CANCELLED",
+  "absent_is_final": false,
+  "evidence_tier": "E1",
+  "read_at": "2026-09-30T21:59:52.529Z",
+  "response_hash": "sha256:6ddc91aac066a17b1ffde848ecd55357656f0f6fed471d43e3325db08c8580f3",
+  "detail": null
+}
