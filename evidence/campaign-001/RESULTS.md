@@ -36,13 +36,41 @@ and lose in none. T beats B1 in none and loses in one (F10). The headline claim 
 a careful script is therefore **not supported**. Per the rule, the claim is narrowed to what the evidence shows:
 
 > Under ten documented supplier fault patterns, a naive agent leaves bookings stranded or duplicated in most
-> runs. A careful engineer's script avoids that. Intyr provides the same careful behaviour as one paid call per
-> step, 2.9 calls per trip from the caller's side, with signed manifests and decision records, and it matched
-> that script in ten of eleven cells and lost one.
+> runs. A careful engineer's script avoids that. Intyr provides the same careful behaviour as one call per
+> step, 2.9 calls to Intyr's API per trip from the caller's side, with signed manifests and decision records,
+> and it matched that script in ten of eleven cells and lost one. On the public host each of those calls is
+> paid over x402; in this campaign they were not (see the deviations below).
+
+## Deviations from the pre-registration
+
+`EVAL_CAMPAIGN.md` is left exactly as committed. These are the places where the runs differ from it.
+
+1. **No payment was exercised.** The pre-registration says T calls the sandbox routes "with TestNet x402
+   payments". T instead ran under server-sponsored sandbox sessions, so no x402 challenge, verify or settle was
+   part of any T run. This campaign measures commit and recovery behaviour only. It is not evidence about the
+   payment path.
+2. **The system under test changed between and during passes.** The first T pass ran against Worker 706e15b2 and
+   is archived, not merged, because its reconciler skipped sponsored trips. The recorded T arm ran against
+   ede2c708, redeployed mid-run to 4672eef3, and TestNet anchoring was switched on mid-run. The details are
+   under "Pre-fix pass and harness faults" below.
+3. **T's declared limits were not pre-registered.** The runner sends `min_readiness` 30 and `max_price_move_pct`
+   10 with every T trip. They were chosen when the runner was written, after the pre-registration.
+4. **The simulator changed before the recorded runs.** Its storage moved from one record per trip to one record
+   per offer, order and attempt (`a37927a`) after a concurrency bug surfaced. B0 and B1 were rerun on the new
+   version and produced identical numbers. The fault behaviour itself did not change.
+5. **Predictions, one by one.**
+   - Prediction 1 **held**. B0 ends inconsistent in F3, F5, F8 and F9 in both shapes, and believes the booking
+     that does not exist in F7. It is also inconsistent in F4 and F6, which the prediction did not name.
+   - Prediction 2 **failed in part**. B1 matches T on most cells, but T is not ahead on F7 (both are consistent
+     in every run) and is behind on F10.
+   - Prediction 3 **held in outcome but not in name**. T is consistent in every cell except F10. In F10 it ends
+     `RECOVERY_FAILED` naming the stranded leg, not `MANUAL_REVIEW` as predicted.
+   - Prediction 4 **failed**. Completion when feasible is 75% for both T and B1, not 100%, because neither
+     completes F1.
 
 ## Numbers
 
-| Arm | Runs | Consistent terminal rate | Completion when feasible | Orphan USD per 100 trips | Duplicate orders | Belief mismatches | Calls per trip |
+| Arm | Runs | Consistent terminal rate | Completion when feasible | Orphan USD per 100 trips | Duplicate orders | Belief mismatches | Calls per trip (supplier calls for B0 and B1, Intyr API calls for T) |
 |---|---|---|---|---|---|---|---|
 | B0 naive | 110 | 36% | 25% | 24,914.94 | 20 | 20 | 3.6 supplier calls |
 | B1 careful script | 110 | 100% | 75% | 0.00 | 0 | 0 | 8.7 supplier calls, 431 lines of the caller's own code |

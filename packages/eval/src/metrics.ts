@@ -100,7 +100,7 @@ export function markdownTable(byCell: CellMetrics[], byArm: ArmSummary[], cells:
         `| ${m.arm} | ${m.cell} ${title.get(m.cell) ?? ""} | ${m.n} | ${m.complete} | ${m.unwound} | ${m.inconsistent} | ${pct(m.ctr)} | ${m.orphan_usd_per_100.toFixed(2)} | ${m.duplicate_orders} | ${m.belief_mismatches} |`,
     ),
     "",
-    "| Arm | Runs | CTR | Completion when feasible | Orphan USD / 100 trips | Duplicate orders | Belief mismatches | Unknown beliefs | Mean supplier calls |",
+    "| Arm | Runs | CTR | Completion when feasible | Orphan USD / 100 trips | Duplicate orders | Belief mismatches | Unknown beliefs | Mean calls per trip (supplier calls for B0 and B1, Intyr API calls for T) |",
     "|---|---|---|---|---|---|---|---|---|",
     ...byArm.map(
       (m) =>

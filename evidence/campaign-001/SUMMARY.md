@@ -38,7 +38,7 @@ Suppliers in these runs are the seeded simulator (SIMULATED). B0 and B1 ran in p
 | T | F9 Non-refundable flight, hotel refuses | 10 | 0 | 10 | 0 | 100% | 0.00 | 0 | 0 |
 | T | F10 Hotel cannot be cancelled, flight refuses | 10 | 0 | 1 | 9 | 10% | 16378.10 | 0 | 0 |
 
-| Arm | Runs | CTR | Completion when feasible | Orphan USD / 100 trips | Duplicate orders | Belief mismatches | Unknown beliefs | Mean supplier calls |
+| Arm | Runs | CTR | Completion when feasible | Orphan USD / 100 trips | Duplicate orders | Belief mismatches | Unknown beliefs | Mean calls per trip (supplier calls for B0 and B1, Intyr API calls for T) |
 |---|---|---|---|---|---|---|---|---|
 | B0 | 110 | 36% | 25% | 24914.94 | 20 | 20 | 30 | 3.6 |
 | B1 | 110 | 100% | 75% | 0.00 | 0 | 0 | 0 | 8.7 |
