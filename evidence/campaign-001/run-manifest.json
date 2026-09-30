@@ -1,0 +1,130 @@
+{
+  "campaign": "campaign-001",
+  "environment": "in-process seeded simulator (SIMULATED suppliers)",
+  "git_sha": "773831dcfadbbf8eeb5a501cbdae0931047b95af",
+  "node": "v24.19.0",
+  "arms": {
+    "B0": {
+      "file": "packages/eval/src/arms/b0-naive.ts",
+      "sha256": "eb79ae084a799d5725d193a62cef29cab57e61bd8c7217969296e6cab501d868"
+    },
+    "B1": {
+      "file": "packages/eval/src/arms/b1-competent.ts",
+      "sha256": "293c6d2c793558c4e7dd3c086b2748c67dce312fb04547cecee44f4640bcb484"
+    }
+  },
+  "cells": [
+    {
+      "id": "C0",
+      "title": "Healthy control, no faults",
+      "faults": {},
+      "feasible": true
+    },
+    {
+      "id": "F1",
+      "title": "Flight reprices between quote and payment",
+      "faults": {
+        "FLIGHT": "PRICE_DIVERGENCE"
+      },
+      "feasible": true
+    },
+    {
+      "id": "F2",
+      "title": "Flight inventory gone at commit",
+      "faults": {
+        "FLIGHT": "UNAVAILABLE_AT_COMMIT"
+      },
+      "feasible": false
+    },
+    {
+      "id": "F3",
+      "title": "Hotel refuses the booking after the flight confirmed",
+      "faults": {
+        "HOTEL": "COMMIT_REJECT"
+      },
+      "feasible": false
+    },
+    {
+      "id": "F4",
+      "title": "Flight accepted asynchronously, then fails",
+      "faults": {
+        "FLIGHT": "ACCEPTED_ASYNC_FAILS"
+      },
+      "feasible": false
+    },
+    {
+      "id": "F5",
+      "title": "Flight booked but the response is lost",
+      "faults": {
+        "FLIGHT": "TIMEOUT_BOOKED"
+      },
+      "feasible": true
+    },
+    {
+      "id": "F6",
+      "title": "Hotel times out and nothing was booked",
+      "faults": {
+        "HOTEL": "TIMEOUT_NOT_BOOKED"
+      },
+      "feasible": false
+    },
+    {
+      "id": "F7",
+      "title": "Hotel says confirmed but no booking exists",
+      "faults": {
+        "HOTEL": "RESPONSE_OK_STATUS_DISAGREES"
+      },
+      "feasible": false
+    },
+    {
+      "id": "F8",
+      "title": "Flight response lost, supplier duplicates on retry",
+      "faults": {
+        "FLIGHT": "DUPLICATE_ON_RETRY"
+      },
+      "feasible": true
+    },
+    {
+      "id": "F9",
+      "title": "Non-refundable flight, hotel refuses",
+      "faults": {
+        "FLIGHT": "NON_REFUNDABLE",
+        "HOTEL": "COMMIT_REJECT"
+      },
+      "feasible": false
+    },
+    {
+      "id": "F10",
+      "title": "Hotel cannot be cancelled, flight refuses",
+      "faults": {
+        "HOTEL": "CANCEL_REFUSED",
+        "FLIGHT": "COMMIT_REJECT"
+      },
+      "feasible": false
+    }
+  ],
+  "shapes": [
+    {
+      "id": "S1",
+      "types": [
+        "FLIGHT",
+        "HOTEL"
+      ]
+    },
+    {
+      "id": "S2",
+      "types": [
+        "FLIGHT",
+        "HOTEL",
+        "GROUND"
+      ]
+    }
+  ],
+  "repeats": 5,
+  "runs": 220,
+  "artifacts": {
+    "results": "results.jsonl",
+    "summary": "summary.json",
+    "table": "SUMMARY.md"
+  }
+}
