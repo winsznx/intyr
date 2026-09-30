@@ -1,0 +1,16 @@
+{
+  "document": "packages/eval/EVAL_CAMPAIGN.md",
+  "document_sha256": "fb6038c8bd37173ff4a4f805c2e577e981a416ce9e1b7322b54fae1be0d6c722",
+  "note": "intyr:prereg:v1:fb6038c8bd37173ff4a4f805c2e577e981a416ce9e1b7322b54fae1be0d6c722",
+  "network": "testnet",
+  "sender": "MH22ASOZRJKSWIXBRWRRTXSVEVLP24IAZ7IVMZMD73VOSY4GHNXAJVH72M",
+  "txid": "WHP6YBEIU3B4QR3RMA2UHO6R2FVHQOJ6PHAAKETTJZPF3GXXWWNA",
+  "submit_state": "ACCEPTED",
+  "lookup": {
+    "state": "CONFIRMED",
+    "round": 67823189,
+    "source": "algod"
+  },
+  "explorer": "https://testnet.allo.info/tx/WHP6YBEIU3B4QR3RMA2UHO6R2FVHQOJ6PHAAKETTJZPF3GXXWWNA",
+  "anchored_at": "2026-09-30T22:24:59.892Z"
+}
