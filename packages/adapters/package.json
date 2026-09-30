@@ -10,9 +10,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke": "tsx scripts/live-smoke.ts"
   },
   "dependencies": {
     "@intyr/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
   }
 }
