@@ -211,7 +211,9 @@ function evaluate(legs: Leg[], currency: string, policy: Policy, now: Date, read
   if (required.some((l) => earliestExpiry(l)! - now.getTime() < policy.near_expiry_seconds * 1000)) {
     return { outcome: "UNKNOWN", reasons: ["PRICE_VALIDITY_NEAR_EXPIRY"] };
   }
-  if (readiness < policy.min_readiness) return { outcome: "REFUSE", reasons: ["READINESS_BELOW_THRESHOLD"] };
+  if (readiness < policy.min_readiness) {
+    return { outcome: policy.below_readiness === "REVIEW" ? "MANUAL_REVIEW" : "REFUSE", reasons: ["READINESS_BELOW_THRESHOLD"] };
+  }
   if (exposure.irreversible_minor > policy.autonomous_irreversible_cap_minor) {
     return { outcome: "MANUAL_REVIEW", reasons: ["IRREVERSIBLE_EXPOSURE_ABOVE_CAP"] };
   }

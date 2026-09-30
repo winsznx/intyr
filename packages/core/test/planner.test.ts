@@ -8,7 +8,7 @@ import {
   planTrip,
   type PreparedLegInput,
 } from "../src/planner";
-import { PUBLIC_DEFAULT_POLICY } from "../src/policy";
+import { basePolicyFor, effectivePolicy, PUBLIC_DEFAULT_POLICY, SANDBOX_SUPPLIER_POLICY } from "../src/policy";
 import { generateSigningKey, publishedKey, verifyDocument } from "../src/sign";
 import { checkRequest, inMinutes, irreversibleWireLeg, NOW, TRIP_ID, wireLeg } from "./fixtures";
 
@@ -217,6 +217,31 @@ const PREPARED: PreparedLegInput = {
   irreversible: true,
 };
 
+describe("basePolicyFor", () => {
+  const sandbox = { required: true, evidence_grade: "SUPPLIER_SANDBOX" as const };
+  const simulated = { required: true, evidence_grade: "SIMULATED" as const };
+
+  it.each([
+    { name: "a TestNet trip of sandbox supplier legs", env: "TESTNET" as const, legs: [sandbox, sandbox], version: "sandbox-supplier-v1" },
+    { name: "the same trip on Mainnet", env: "MAINNET" as const, legs: [sandbox, sandbox], version: "public-default-v1" },
+    { name: "a TestNet trip with a simulated required leg", env: "TESTNET" as const, legs: [sandbox, simulated], version: "public-default-v1" },
+    {
+      name: "a TestNet trip whose only simulated leg is optional",
+      env: "TESTNET" as const,
+      legs: [sandbox, { ...simulated, required: false }],
+      version: "sandbox-supplier-v1",
+    },
+    { name: "a trip with no legs", env: "TESTNET" as const, legs: [], version: "public-default-v1" },
+  ])("uses $version for $name", ({ env, legs, version }) => {
+    expect(basePolicyFor(env, legs).policy_version).toBe(version);
+  });
+
+  it("keeps review routing when request limits tighten the policy", () => {
+    const tightened = effectivePolicy(SANDBOX_SUPPLIER_POLICY, { min_readiness: 30, max_total_minor: 100_000 });
+    expect([tightened.below_readiness, tightened.min_readiness, tightened.max_total_minor]).toEqual(["REVIEW", 70, 100_000]);
+  });
+});
+
 describe("legFromPrepared", () => {
   it("keeps the adapter's evidence grade and clocks", () => {
     const leg = legFromPrepared(PREPARED);
@@ -245,6 +270,40 @@ describe("decidePrepare", () => {
 
     // #then the decision is bound to the trip and mirrors the assessment
     expect([decision.gate, decision.subject, decision.outcome]).toEqual(["PREPARE", { trip_id: TRIP_ID }, assessment.outcome]);
+  });
+
+  it("refuses a low-readiness supplier sandbox leg under the public default policy", async () => {
+    const { decision } = await decidePrepare({
+      trip_id: TRIP_ID,
+      currency: "USD",
+      legs: [legFromPrepared(PREPARED)],
+      policy: PUBLIC_DEFAULT_POLICY,
+      now: NOW,
+    });
+    expect([decision.outcome, decision.reason_codes]).toEqual(["REFUSE", ["READINESS_BELOW_THRESHOLD"]]);
+  });
+
+  it("asks the session approver about the same leg under the sandbox supplier policy", async () => {
+    // #given an instant-payment, non-refundable sandbox offer that scores below the bar
+    const legs = [legFromPrepared(PREPARED)];
+
+    // #when the prepare gate runs under the policy chosen for a TestNet sandbox-supplier trip
+    const { assessment, decision } = await decidePrepare({
+      trip_id: TRIP_ID,
+      currency: "USD",
+      legs,
+      policy: basePolicyFor("TESTNET", legs),
+      now: NOW,
+    });
+
+    // #then the bar is unchanged and a person decides, under a policy version that says so
+    expect([
+      decision.outcome,
+      decision.reason_codes,
+      decision.required_role,
+      decision.policy_version,
+      assessment.readiness.minimum_required,
+    ]).toEqual(["MANUAL_REVIEW", ["READINESS_BELOW_THRESHOLD"], "SESSION_APPROVER", "sandbox-supplier-v1", 70]);
   });
 
   it("reaches the same verdict as assessLegs for the same legs", async () => {

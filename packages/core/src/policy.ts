@@ -1,4 +1,6 @@
 import type { Limits } from "./schema";
+import type { Leg } from "./types";
+import type { Environment } from "./vocab";
 
 /**
  * Policy the kernel enforces independently of the calling agent. Request
@@ -14,6 +16,8 @@ export interface Policy {
   near_expiry_seconds: number;
   max_total_minor?: number;
   max_irreversible_minor?: number;
+  /** What a readiness below `min_readiness` means: a refusal, or a decision a person must make. Default REFUSE. */
+  below_readiness?: "REFUSE" | "REVIEW";
 }
 
 export const PUBLIC_DEFAULT_POLICY: Policy = {
@@ -23,6 +27,26 @@ export const PUBLIC_DEFAULT_POLICY: Policy = {
   autonomous_irreversible_cap_minor: 50_000,
   near_expiry_seconds: 120,
 };
+
+/**
+ * TestNet trips whose required legs all come from a supplier's own sandbox
+ * (Duffel test mode, LiteAPI sandbox). Those offers are instant-payment and
+ * non-refundable by construction, so they score below the readiness bar. The
+ * bar stays where it is, and a low score asks the session approver instead of
+ * refusing. The decision records this policy version.
+ */
+export const SANDBOX_SUPPLIER_POLICY: Policy = {
+  ...PUBLIC_DEFAULT_POLICY,
+  policy_version: "sandbox-supplier-v1",
+  below_readiness: "REVIEW",
+};
+
+/** Base policy for a trip. Anything simulated, caller-asserted or on Mainnet keeps the public default. */
+export function basePolicyFor(environment: Environment, legs: ReadonlyArray<Pick<Leg, "required" | "evidence_grade">>): Policy {
+  const required = legs.filter((l) => l.required);
+  const allSandboxSupplier = required.length > 0 && required.every((l) => l.evidence_grade === "SUPPLIER_SANDBOX");
+  return environment === "TESTNET" && allSandboxSupplier ? SANDBOX_SUPPLIER_POLICY : PUBLIC_DEFAULT_POLICY;
+}
 
 function stricterMax(a: number | undefined, b: number | undefined): number | undefined {
   if (a === undefined) return b;
