@@ -26,7 +26,7 @@ import type { HandlerResult, PaidContext } from "../../payments/ladder";
 import type { TripStore } from "../store";
 import { emptyTripDoc, type TripComponentDoc, type TripDoc, type TripNextAction } from "../trip-doc";
 import { DecisionLog, type ServiceDeps } from "./context";
-import { paymentRef, toManifestComponent } from "./convert";
+import { paymentRefs, toManifestComponent } from "./convert";
 
 export function invalid(issues: Array<{ path: string; message: string }>): HandlerResult {
   return {
@@ -44,7 +44,7 @@ export function parseIntent(body: unknown): ParseResult<PublicTripIntent> {
 }
 
 export function tripOwner(ctx: PaidContext, sessionId?: string): string {
-  return sessionId ? `session:${sessionId}` : `payer:${ctx.session.payer}`;
+  return sessionId ? `session:${sessionId}` : `payer:${ctx.session?.payer ?? "unknown"}`;
 }
 
 function summarize(leg: PreparedLeg): TripComponentDoc["summary"] {
@@ -252,7 +252,7 @@ const VERDICT_OF_OUTCOME: Record<GateDecision["outcome"], string> = {
 /** Runs the PREPARE gate over prepared legs, then builds and signs the commit manifest. Shared by prepare and revalidate. */
 export async function buildManifest(
   deps: ServiceDeps,
-  input: { tripId: string; legs: PreparedLeg[]; intent: PublicTripIntent; intentHash: string; supersedes?: string; inbound: ReturnType<typeof paymentRef>[]; decisionHashes: string[]; prevDecisionHash?: string },
+  input: { tripId: string; legs: PreparedLeg[]; intent: PublicTripIntent; intentHash: string; supersedes?: string; inbound: ReturnType<typeof paymentRefs>; decisionHashes: string[]; prevDecisionHash?: string },
 ): Promise<ManifestBuild> {
   const now = deps.now();
   const policy = effectivePolicy(PUBLIC_DEFAULT_POLICY, input.intent.limits, input.intent.budget_total_minor);
@@ -336,7 +336,7 @@ export async function runPrepare(intent: PublicTripIntent, ctx: PaidContext, dep
 
   const intentHash = await hashValue(canonicalize(JSON.parse(JSON.stringify(intent))));
   doc.intent_hash = intentHash;
-  const build = await buildManifest(deps, { tripId, legs, intent, intentHash, inbound: [paymentRef(ctx.session)], decisionHashes: [] });
+  const build = await buildManifest(deps, { tripId, legs, intent, intentHash, inbound: paymentRefs(ctx.session), decisionHashes: [] });
   doc.components = build.assessment.commit_order.map((id) => {
     const leg = legs.find((l) => l.component_id === id)!;
     return { component_id: id, state: "PREPARED", summary: summarize(leg), leg, refs: null, outcome_verification: null, confirmation: null, cancellation: null };
@@ -421,7 +421,7 @@ export async function runRevalidate(body: unknown, ctx: PaidContext, deps: Servi
     intent: stored.intent,
     intentHash: stored.intentHash,
     ...(doc.manifest_id ? { supersedes: doc.manifest_id } : {}),
-    inbound: [paymentRef(ctx.session)],
+    inbound: paymentRefs(ctx.session),
     decisionHashes: prior.map((d) => d.decision_hash),
     ...(prior.length > 0 ? { prevDecisionHash: prior[prior.length - 1]!.decision_hash } : {}),
   });

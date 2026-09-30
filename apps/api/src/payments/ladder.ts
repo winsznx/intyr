@@ -41,10 +41,12 @@ export interface PaidRoute {
 
 export interface PaidContext {
   network: "mainnet" | "testnet";
+  /** True for a sandbox call the server paid for. No USDC moved and `session` is null. */
+  sponsored: boolean;
   /** Raw value of the sandbox session cookie, when present. Handlers validate it before using it. */
   sandboxSessionId?: string;
   body: unknown;
-  session: PaymentSession;
+  session: PaymentSession | null;
   operationId: string;
   now: string;
 }
@@ -172,7 +174,7 @@ export function createLadder(deps: LadderDeps) {
     }
     let result: HandlerResult;
     try {
-      result = await route.handler({ network: deps.net.name, ...(sandboxSessionId ? { sandboxSessionId } : {}), body, session, operationId: operation.id, now: at });
+      result = await route.handler({ network: deps.net.name, sponsored: false, ...(sandboxSessionId ? { sandboxSessionId } : {}), body, session, operationId: operation.id, now: at });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       const failed = envelope(session, deps.net, {

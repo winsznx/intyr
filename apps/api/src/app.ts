@@ -6,13 +6,16 @@ import { ROUTE_PRICES, atomicToUsdc } from "./prices";
 import type { Ladder, PaidRoute } from "./payments/ladder";
 import { getOperation, getSessionById } from "./payments/sessions";
 import { notAvailable, type DomainHandlers, type RouteKey } from "./domain";
-import { mountSandbox } from "./sandbox";
+import { mountSandbox, mountSandboxActions } from "./sandbox";
+import { buildServiceDeps } from "./domain/wire";
+import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
 
 export interface NetworkDeps {
   net: NetworkConfig;
   payTo: string;
   ladder: Ladder;
+  domain: DomainHandlers;
 }
 
 export interface AppDeps {
@@ -20,7 +23,6 @@ export interface AppDeps {
   /** Mainnet serves /v1 and is the only network registered in the Bazaar. TestNet serves /sandbox/v1. */
   mainnet?: NetworkDeps;
   testnet?: NetworkDeps;
-  domain: DomainHandlers;
   version: { name: string; commit: string; contract_versions: Record<string, string> };
 }
 
@@ -75,14 +77,26 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
 
   const store = new TripStore(db);
   const primary = deps.mainnet ?? deps.testnet;
-  if (deps.testnet) mountSandbox(app, { db });
+  if (deps.testnet) {
+    mountSandbox(app, { db });
+    let service: ReturnType<typeof buildServiceDeps> | undefined;
+    mountSandboxActions(app, { db, service: () => (service ??= buildServiceDeps(deps.env, "TESTNET")) });
+  }
   const nets: NetworkDeps[] = [deps.mainnet, deps.testnet].filter((n): n is NetworkDeps => Boolean(n));
 
   for (const n of nets) {
     const prefix = routePrefix(n.net.name);
-    for (const route of buildPaidRoutes(deps.domain, prefix)) {
+    for (const route of buildPaidRoutes(n.domain, prefix)) {
       const path = route.key.split(" ")[1]!;
-      app.post(path, (c) => n.ladder(c, route));
+      if (n.net.name === "testnet") {
+        // A live sandbox cookie without a payment proof is sponsored by the server. Anything else pays through x402.
+        app.post(path, async (c) => {
+          const sid = await sponsoredSession(c, store, new Date());
+          return sid ? runSponsored(c, route, { db, sandboxSessionId: sid }) : n.ladder(c, route);
+        });
+      } else {
+        app.post(path, (c) => n.ladder(c, route));
+      }
     }
     app.get(`${prefix}/prices`, (c) => c.json(pricesPayload(n)));
     app.get(`${prefix}/capabilities`, (c) =>

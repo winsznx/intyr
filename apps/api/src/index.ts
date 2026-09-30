@@ -4,7 +4,7 @@ import { createLadder, reconcileSession } from "./payments/ladder";
 import { listStaleSessions } from "./payments/sessions";
 import { createX402Server } from "./server";
 import { createApp, type NetworkDeps } from "./app";
-import { createDomain } from "./domain/wire";
+import { createDomain, type Domain } from "./domain/wire";
 
 const VERSION = { name: "intyr", commit: "dev", contract_versions: { manifest: "v1" } };
 
@@ -18,14 +18,15 @@ function buildNetwork(env: Env, name: "mainnet" | "testnet", payTo: string) {
     payTo,
     teamWallets: (env.TEAM_WALLETS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
   });
-  const deps: NetworkDeps = { net, payTo, ladder };
-  return { deps, init: () => httpServer.initialize(), net };
+  const domain: Domain = createDomain(env, name === "mainnet" ? "MAINNET" : "TESTNET");
+  const deps: NetworkDeps = { net, payTo, ladder, domain: domain.handlers };
+  return { deps, init: () => httpServer.initialize(), net, reconcile: domain.reconcile };
 }
 
 function build(env: Env) {
   const mainnet = env.PAY_TO_MAINNET ? buildNetwork(env, "mainnet", env.PAY_TO_MAINNET) : undefined;
   const testnet = env.PAY_TO_TESTNET ? buildNetwork(env, "testnet", env.PAY_TO_TESTNET) : undefined;
-  const app = createApp({ env, mainnet: mainnet?.deps, testnet: testnet?.deps, domain: createDomain(env), version: VERSION });
+  const app = createApp({ env, mainnet: mainnet?.deps, testnet: testnet?.deps, version: VERSION });
   const nets: NetworkConfig[] = [mainnet?.net, testnet?.net].filter((n): n is NetworkConfig => Boolean(n));
   // A promise created in one request cannot be awaited from another in workerd, so initialization is
   // retried inside whichever request needs it. The resource server keeps the result as plain data.
@@ -41,7 +42,8 @@ function build(env: Env) {
       return false;
     }
   };
-  return { app, ensureReady, nets };
+  const reconcilers = [mainnet?.reconcile, testnet?.reconcile].filter((f): f is () => Promise<number> => Boolean(f));
+  return { app, ensureReady, nets, reconcilers };
 }
 
 let cache: { env: Env; built: ReturnType<typeof build> } | null = null;
@@ -79,6 +81,7 @@ export default {
           const net = built.nets.find((n) => n.caip2 === session.network);
           if (net) await reconcileSession({ db: env.DB, net }, session);
         }
+        for (const reconcile of built.reconcilers) await reconcile();
       })(),
     );
   },

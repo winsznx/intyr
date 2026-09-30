@@ -56,6 +56,10 @@ export function toPlannerLeg(leg: PreparedLeg): CallerLeg {
   };
 }
 
+export function paymentRefs(session: PaymentSession | null): PaymentRef[] {
+  return session ? [paymentRef(session)] : [];
+}
+
 export function paymentRef(session: PaymentSession): PaymentRef {
   return {
     session_id: session.id,

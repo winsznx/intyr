@@ -14,7 +14,7 @@ import {
 import type { PaymentSession } from "../../payments/sessions";
 import type { TripComponentDoc, TripDoc } from "../trip-doc";
 import { DecisionLog, type ServiceDeps } from "./context";
-import { paymentRef, toManifestComponent } from "./convert";
+import { paymentRefs, toManifestComponent } from "./convert";
 import { updateTripDoc } from "./trip-update";
 
 export const RECOVERY_POLICY_VERSION = "public-default-v1";
@@ -192,7 +192,7 @@ export async function finalizeManifest(
   deps: ServiceDeps,
   tripId: string,
   finalState: TripState,
-  session: PaymentSession,
+  session: PaymentSession | null,
 ): Promise<{ manifestId: string; hash: string; signed: unknown }> {
   const row = (await deps.store.getTrip(tripId))!;
   const doc = JSON.parse(row.doc_json) as TripDoc;
@@ -209,7 +209,7 @@ export async function finalizeManifest(
     components,
     decisions: decisions.map((d) => ({ decision_id: d.decision_id, gate: d.gate, outcome: d.outcome, reason_codes: d.reason_codes, decision_hash: d.decision_hash })),
     non_actions: decisions.filter((d) => d.outcome === "NO_ACTION").map((d) => ({ gate: d.gate, reason: d.reason_codes[0]!, subject: d.subject.component_id ?? d.subject.trip_id ?? "" })),
-    inbound_payments: [paymentRef(session)],
+    inbound_payments: paymentRefs(session),
     outbound_payments: [],
     anchors: [],
     stranded_spend_minor: doc.stranded_spend_minor,

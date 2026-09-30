@@ -66,7 +66,7 @@ async function harness(domain?: DomainHandlers): Promise<Harness> {
       },
     },
   };
-  const app = createApp({ env, testnet: { net, payTo: PAY_TO, ladder } as NetworkDeps, domain: handlers, version: { name: "intyr", commit: "test", contract_versions: {} } });
+  const app = createApp({ env, testnet: { net, payTo: PAY_TO, ladder, domain: handlers } as NetworkDeps, version: { name: "intyr", commit: "test", contract_versions: {} } });
   return { app, db, fac, chain, handlerCalls };
 }
 
@@ -266,7 +266,7 @@ describe("payment ladder", () => {
       return new Response("{}", { status: 404 });
     }) as unknown as typeof fetch;
     const ladder = createLadder({ db, httpServer, net, payTo: PAY_TO, teamWallets: [payer.addr], fetchFn, confirmWaitMs: 10, sleep: async () => undefined });
-    const app = createApp({ env, testnet: { net, payTo: PAY_TO, ladder } as NetworkDeps, domain: { "POST /v1/trips/check": { handler: async () => ({ status: 200, body: {} }) } }, version: { name: "t", commit: "t", contract_versions: {} } });
+    const app = createApp({ env, testnet: { net, payTo: PAY_TO, ladder, domain: { "POST /v1/trips/check": { handler: async () => ({ status: 200, body: {} }) } } } as NetworkDeps, version: { name: "t", commit: "t", contract_versions: {} } });
     const ch = await app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
     const reqs = decodePaymentRequiredHeader(ch.headers.get("payment-required")!).accepts[0] as unknown as Record<string, unknown>;
     const built = buildPaymentHeader({ payer, requirements: reqs, resourceUrl: URL_ + "/sandbox/v1/trips/check" });

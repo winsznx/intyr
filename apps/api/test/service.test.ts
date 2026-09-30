@@ -33,7 +33,7 @@ const session = (route: string): PaymentSession => ({
   updated_at: "",
 });
 
-const ctx = (route: string, body: unknown): PaidContext => ({ network: "testnet", body, session: session(route), operationId: "ops_test", now: new Date().toISOString() });
+const ctx = (route: string, body: unknown): PaidContext => ({ network: "testnet", sponsored: false, body, session: session(route), operationId: "ops_test", now: new Date().toISOString() });
 
 async function setup(now = new Date()) {
   const db = createTestD1();

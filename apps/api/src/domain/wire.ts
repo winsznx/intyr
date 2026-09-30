@@ -6,7 +6,8 @@ import { createAdapterRegistry } from "./adapters";
 import { TripStore } from "./store";
 import type { ServiceDeps } from "./service/context";
 import { parseCheck, parseIntent, invalid, runCheck, runPrepare, runRevalidate, tripOwner } from "./service/prepare";
-import { precheckCommit, runCommit } from "./service/commit";
+import { precheckCommit, reconcileUnknownTrips, runCommit } from "./service/commit";
+import type { PaymentSession } from "../payments/sessions";
 import { precheckRecover, runRecover } from "./service/recover-route";
 
 const KEY_ID = "intyr-2026-09-a";
@@ -21,20 +22,40 @@ async function validSession(store: TripStore, raw: string | undefined, now: Date
  * Wires the domain handlers for one network. A missing signing key leaves every route refusing before any
  * charge, because a manifest nobody can verify is worse than no manifest.
  */
-export function createDomain(env: Env, environment: Environment = "TESTNET"): DomainHandlers {
-  if (!env.MANIFEST_SIGNING_JWK) return {};
+export interface Domain {
+  handlers: DomainHandlers;
+  /** Resumes commits that paused on an unknown supplier outcome. Returns how many moved. */
+  reconcile: () => Promise<number>;
+}
+
+export function buildServiceDeps(env: Env, environment: Environment): ServiceDeps | null {
+  if (!env.MANIFEST_SIGNING_JWK) return null;
   const key: SigningKey = signingKeyFromJwkJson(KEY_ID, env.MANIFEST_SIGNING_JWK);
-  const store = new TripStore(env.DB);
-  const deps: ServiceDeps = {
-    store,
+  return {
+    store: new TripStore(env.DB),
     adapters: createAdapterRegistry(env),
     key,
     environment,
     allowScenario: environment === "TESTNET",
     now: () => new Date(),
   };
+}
 
-  return {
+export function createDomain(env: Env, environment: Environment): Domain {
+  const deps = buildServiceDeps(env, environment);
+  if (!deps) return { handlers: {}, reconcile: async () => 0 };
+  const store = deps.store;
+
+  const sessionForTrip = async (tripId: string): Promise<PaymentSession | null> =>
+    env.DB
+      .prepare(
+        `SELECT p.* FROM payment_sessions p JOIN operations o ON o.session_id = p.id
+         WHERE o.trip_id = ?1 AND o.route LIKE '%/trips/commit' ORDER BY o.created_at DESC LIMIT 1`,
+      )
+      .bind(tripId)
+      .first<PaymentSession>();
+
+  const handlers: DomainHandlers = {
     "POST /v1/trips/check": {
       precheck: async (body) => {
         const p = parseCheck(body);
@@ -71,6 +92,7 @@ export function createDomain(env: Env, environment: Environment = "TESTNET"): Do
       handler: (ctx) => runRecover(ctx.body, ctx, deps),
     },
   };
+  return { handlers, reconcile: () => reconcileUnknownTrips(deps, sessionForTrip) };
 }
 
 export { tripOwner };
