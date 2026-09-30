@@ -186,6 +186,19 @@ describe("simulator adapter", () => {
     expect(res.no_booking_certain).toBe(true);
   });
 
+  it("keeps both offers when two components of one trip are prepared concurrently", async () => {
+    const { sim } = setup();
+    const seed = "concurrent";
+    const [flight, hotel] = await Promise.all([
+      sim.prepare({ component_id: "flight-1", type: "FLIGHT", adults: 1, currency: "USD", sim: { scenario: "HAPPY", seed } }),
+      sim.prepare({ component_id: "hotel-2", type: "HOTEL", adults: 1, currency: "USD", sim: { scenario: "HAPPY", seed } }),
+    ]);
+    if (!flight.ok || !hotel.ok) throw new Error("prepare failed");
+    const [a, b] = await Promise.all([sim.commit(commitReq(flight.leg, "ref-f")), sim.commit(commitReq(hotel.leg, "ref-h"))]);
+    expect([a.response, b.response]).toEqual(["RESPONDED_CONFIRMED", "RESPONDED_CONFIRMED"]);
+    expect(await sim.auditOrders(seed)).toHaveLength(2);
+  });
+
   it("returns OVER_BUDGET when the cap is below every price", async () => {
     const { sim } = setup();
     const res = await sim.prepare(request("HAPPY", { max_price_minor: 1 }));

@@ -33,9 +33,15 @@ import { emptyRefs, hashJson, iso, unknownClocks } from "./util";
  * creates two orders. Safety has to come from reconcile-before-retry.
  */
 
+/**
+ * Key-value storage for simulator state. Every offer, order and commit attempt
+ * is its own record, so concurrent calls for different components of one trip
+ * never overwrite each other. `list` returns every record under a key prefix.
+ */
 export interface SimulatorStore {
   get(key: string): Promise<string | null>;
   put(key: string, value: string): Promise<void>;
+  list(prefix: string): Promise<Array<{ key: string; value: string }>>;
 }
 
 export class MemorySimulatorStore implements SimulatorStore {
@@ -45,6 +51,9 @@ export class MemorySimulatorStore implements SimulatorStore {
   }
   async put(key: string, value: string): Promise<void> {
     this.data.set(key, value);
+  }
+  async list(prefix: string): Promise<Array<{ key: string; value: string }>> {
+    return [...this.data.entries()].filter(([k]) => k.startsWith(prefix)).map(([key, value]) => ({ key, value }));
   }
 }
 
@@ -89,6 +98,18 @@ interface SimState {
   offers: Record<string, SimOffer>;
   orders: SimOrder[];
   attempts: Record<string, SimAttempt>;
+  /** Serialized form of every record as loaded, so `save` writes only what changed. */
+  loaded: Map<string, string>;
+}
+
+function offerKey(seed: string, id: string): string {
+  return `sim:${seed}:offer:${id}`;
+}
+function orderKey(seed: string, id: string): string {
+  return `sim:${seed}:order:${id}`;
+}
+function attemptKey(seed: string, ref: string): string {
+  return `sim:${seed}:attempt:${encodeURIComponent(ref)}`;
 }
 
 export interface SimulatorOptions {
@@ -104,6 +125,8 @@ const PRICE_BANDS: Record<ComponentType, [number, number]> = {
   FLIGHT: [18_000, 42_000],
   HOTEL: [9_000, 26_000],
   GROUND: [2_500, 8_000],
+  ESIM: [500, 2_500],
+  DATA: [1, 50],
 };
 
 async function seededInt(seed: string, label: string, min: number, max: number): Promise<number> {
@@ -505,11 +528,35 @@ export class SimulatorAdapter implements IntyrAdapter {
   }
 
   private async load(seed: string): Promise<SimState> {
-    const raw = await this.options.store.get(`sim:${seed}`);
-    return raw ? (JSON.parse(raw) as SimState) : { offers: {}, orders: [], attempts: {} };
+    const state: SimState = { offers: {}, orders: [], attempts: {}, loaded: new Map() };
+    for (const { key, value } of await this.options.store.list(`sim:${seed}:`)) {
+      state.loaded.set(key, value);
+      const rest = key.slice(`sim:${seed}:`.length);
+      if (rest.startsWith("offer:")) {
+        const offer = JSON.parse(value) as SimOffer;
+        state.offers[offer.offer_id] = offer;
+      } else if (rest.startsWith("order:")) {
+        state.orders.push(JSON.parse(value) as SimOrder);
+      } else if (rest.startsWith("attempt:")) {
+        const attempt = JSON.parse(value) as SimAttempt;
+        state.attempts[attempt.idempotency_ref] = attempt;
+      }
+    }
+    state.orders.sort((a, b) => (a.created_at === b.created_at ? a.booking_id.localeCompare(b.booking_id) : a.created_at.localeCompare(b.created_at)));
+    return state;
   }
 
+  /** Writes only records that are new or changed since `load`, never a whole-trip blob. */
   private async save(seed: string, state: SimState): Promise<void> {
-    await this.options.store.put(`sim:${seed}`, JSON.stringify(state));
+    const records: Array<[string, string]> = [
+      ...Object.values(state.offers).map((o): [string, string] => [offerKey(seed, o.offer_id), JSON.stringify(o)]),
+      ...state.orders.map((o): [string, string] => [orderKey(seed, o.booking_id), JSON.stringify(o)]),
+      ...Object.values(state.attempts).map((a): [string, string] => [attemptKey(seed, a.idempotency_ref), JSON.stringify(a)]),
+    ];
+    for (const [key, value] of records) {
+      if (state.loaded.get(key) === value) continue;
+      await this.options.store.put(key, value);
+      state.loaded.set(key, value);
+    }
   }
 }
