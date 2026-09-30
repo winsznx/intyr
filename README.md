@@ -25,6 +25,10 @@ anything else.
 | `POST /v1/trips/commit` | 0.50 USDC | Commits the exact manifest hash the agent approved. A leg is confirmed only after an independent read-back, and a timeout becomes `COMMIT_STATUS_UNKNOWN` instead of a retry |
 | `POST /v1/trips/recover` | 0.25 USDC | Cancels what can still be cancelled inside limits set before payment, and reports what cannot |
 
+A trip belongs to the payer address that prepared it, or to the sandbox session it was prepared in.
+`revalidate`, `commit` and `recover` refuse anyone else with `403 NOT_TRIP_OWNER` before any payment settles.
+A trip prepared on one network can't be acted on from the other.
+
 The TestNet sandbox serves the same routes under `/sandbox/v1` with TestNet USDC. Intyr settles each payment
 before any supplier work starts. A settlement with an unknown result returns `202` with `payment_state` and
 `payment_txid`, never a second `402`. Discovery is at `/.well-known/x402` and `/llms.txt`.
