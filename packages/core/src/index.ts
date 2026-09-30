@@ -11,3 +11,4 @@ export * from "./policy";
 export * from "./planner";
 export * from "./kernel";
 export * from "./saga";
+export * from "./manifest";
