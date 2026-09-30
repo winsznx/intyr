@@ -7,6 +7,7 @@ import {
 import type { x402HTTPResourceServer } from "@x402/core/server";
 import { canonicalize, hashValue } from "@intyr/core";
 import { routePrefix, type NetworkConfig } from "../config";
+import type { FeeFailure, RefundSummary } from "./refunds";
 import { decodeAvmPayment, PaymentDecodeError, type DecodedPayment } from "./decode";
 import { readPaymentTx, type ChainReading } from "./chain";
 import {
@@ -55,10 +56,14 @@ export interface HandlerResult {
   status: number;
   body: Record<string, unknown>;
   tripId?: string | null;
+  /** Set when the fee bought nothing. The ladder records a refund for the payment. */
+  feeFailure?: FeeFailure;
 }
 
 export interface LadderDeps {
   db: D1Database;
+  /** Runs the refund gate for a payment whose fee bought nothing. Recording failures never change the response. */
+  openRefund?: (input: { session: PaymentSession; delivery: FeeFailure; tripId: string | null }) => Promise<RefundSummary>;
   httpServer: x402HTTPResourceServer;
   net: NetworkConfig;
   payTo: string;
@@ -177,19 +182,31 @@ export function createLadder(deps: LadderDeps) {
       result = await route.handler({ network: deps.net.name, sponsored: false, ...(sandboxSessionId ? { sandboxSessionId } : {}), body, session, operationId: operation.id, now: at });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      const refund = await refundFor(session, "INTYR_FAILURE", null);
       const failed = envelope(session, deps.net, {
         operation_id: operation.id,
         outcome: "FAILED_INTERNAL",
         error: "INTERNAL_ERROR",
-        message: "The payment settled but the operation failed. Replay the same payment proof to retry the operation, or poll the operation.",
-        refund: { state: deps.net.name === "mainnet" ? "DEFERRED" : "REQUESTED", note: "Refund handling is recorded; Mainnet refunds are operator approved." },
+        message: "The payment settled but the operation failed on our side. The fee is refunded, see refund.",
+        refund,
       });
       await completeOperation(deps.db, operation.id, "FAILED", 500, { ...failed, detail: message }, null, now());
       return new Response(JSON.stringify(failed), { status: 500, headers: { "content-type": "application/json", ...settlementHeaders } });
     }
-    const out = envelope(session, deps.net, { operation_id: operation.id, ...result.body });
+    const refund = result.feeFailure ? await refundFor(session, result.feeFailure, result.tripId ?? null) : undefined;
+    const out = envelope(session, deps.net, { operation_id: operation.id, ...result.body, ...(refund ? { refund } : {}) });
     await completeOperation(deps.db, operation.id, "DONE", result.status, out, result.tripId ?? null, now());
     return new Response(JSON.stringify(out), { status: result.status, headers: { "content-type": "application/json", ...settlementHeaders } });
+  }
+
+  async function refundFor(session: PaymentSession, delivery: FeeFailure, tripId: string | null): Promise<RefundSummary | { state: "RECORD_FAILED"; note: string }> {
+    if (!deps.openRefund) return { state: "RECORD_FAILED", note: "Refunds are not configured on this deployment." };
+    try {
+      return await deps.openRefund({ session, delivery, tripId });
+    } catch (e) {
+      console.error("refund record failed", session.id, e instanceof Error ? e.message : String(e));
+      return { state: "RECORD_FAILED", note: "The refund could not be recorded. Contact the operator with the payment txid." };
+    }
   }
 
   function replayOperation(c: Context, session: PaymentSession, op: OperationRow, headers: Record<string, string>): Response {

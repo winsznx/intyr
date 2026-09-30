@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { networkConfig } from "../src/config";
+import { getRefundBySession, openFeeRefund, summarize } from "../src/payments/refunds";
 import type { NetworkDeps } from "../src/app";
 import { createLadder } from "../src/payments/ladder";
 import { createX402Server } from "../src/server";
@@ -45,7 +46,7 @@ async function harness(domain?: DomainHandlers): Promise<Harness> {
     if (u.endsWith("/v2/status")) return new Response(JSON.stringify({ "last-round": chain.current }), { status: 200 });
     return new Response("{}", { status: 404 });
   }) as unknown as typeof fetch;
-  const ladder = createLadder({ db, httpServer, net, payTo: PAY_TO, teamWallets: [], fetchFn, confirmWaitMs: 50, sleep: async () => undefined });
+  const ladder = createLadder({ db, httpServer, net, payTo: PAY_TO, teamWallets: [], fetchFn, confirmWaitMs: 50, sleep: async () => undefined, openRefund: ({ session, delivery, tripId }) => openFeeRefund(db, { session, environment: "TESTNET", delivery, tripId, now: new Date() }).then(summarize) });
   const handlers: DomainHandlers = domain ?? {
     "POST /v1/trips/check": {
       handler: async (ctx) => {
@@ -247,10 +248,27 @@ describe("payment ladder", () => {
     expect(res.status).toBe(500);
     const body = (await res.json()) as { outcome: string; refund: { state: string }; operation_id: string };
     expect(body.outcome).toBe("FAILED_INTERNAL");
-    expect(["REQUESTED", "DEFERRED"]).toContain(body.refund.state);
+    expect(body.refund.state).toBe("REQUESTED");
+    const stored = await getRefundBySession(h.db, (body as unknown as { payment_session_id: string }).payment_session_id);
+    expect(stored).toMatchObject({ state: "REQUESTED", delivery: "INTYR_FAILURE", amount: "250000" });
     const again = await h.app.request(URL_ + "/sandbox/v1/trips/recover", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ trip_id: "trp_2" }) });
     expect(again.status).toBe(500);
     expect(((await again.json()) as { operation_id: string }).operation_id).toBe(body.operation_id);
+  });
+
+  it("records a refund when the handler reports the fee bought nothing, and never twice for one payment", async () => {
+    h = await harness({
+      "POST /v1/trips/commit": { handler: async () => ({ status: 409, body: { outcome: "NO_ACTION", no_supplier_call_made: true }, feeFailure: "COMMIT_NOT_EXECUTED" }) },
+    });
+    const { res, built } = await pay("/sandbox/v1/trips/commit", { trip_id: "trp_1" });
+    const body = (await res.json()) as { refund: { id: string; state: string }; payment_session_id: string };
+    expect(body.refund.state).toBe("REQUESTED");
+    const replay = await h.app.request(URL_ + "/sandbox/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ trip_id: "trp_1" }) });
+    expect(((await replay.json()) as { refund: { id: string } }).refund.id).toBe(body.refund.id);
+    const rows = await h.db.prepare("SELECT COUNT(*) AS n FROM refunds").first<{ n: number }>();
+    expect(rows?.n).toBe(1);
+    const poll = (await (await h.app.request(`${URL_}/sandbox/v1/payments/${body.payment_session_id}`)).json()) as { refund: { id: string; state: string } };
+    expect(poll.refund).toMatchObject({ id: body.refund.id, state: "REQUESTED" });
   });
 
   it("tags payments from team wallets as INTERNAL_VALIDATION", async () => {

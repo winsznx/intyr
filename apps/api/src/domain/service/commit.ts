@@ -369,7 +369,8 @@ export async function runCommit(body: unknown, ctx: PaidContext, deps: ServiceDe
     return {
       status: httpForOutcome(gate.outcome),
       tripId: row.id,
-      body: { trip_id: row.id, state: row.state, outcome: gate.outcome, decision_id: gate.decision_id, reason_codes: gate.reason_codes, next_actions: gate.next_actions, no_supplier_call_made: true, fee: "REFUND_DUE" },
+      body: { trip_id: row.id, state: row.state, outcome: gate.outcome, decision_id: gate.decision_id, reason_codes: gate.reason_codes, next_actions: gate.next_actions, no_supplier_call_made: true },
+      feeFailure: "COMMIT_NOT_EXECUTED",
     };
   }
 

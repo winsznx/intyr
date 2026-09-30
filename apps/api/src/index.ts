@@ -5,11 +5,13 @@ import { listStaleSessions } from "./payments/sessions";
 import { createX402Server } from "./server";
 import { createApp, type NetworkDeps } from "./app";
 import { createDomain, type Domain } from "./domain/wire";
+import { openFeeRefund, reconcileRefunds, summarize } from "./payments/refunds";
 
 const VERSION = { name: "intyr", commit: "dev", contract_versions: { manifest: "v1" } };
 
 function buildNetwork(env: Env, name: "mainnet" | "testnet", payTo: string) {
   const net = networkConfig(name, env);
+  const environment = name === "mainnet" ? "MAINNET" : "TESTNET";
   const { httpServer } = createX402Server(net, payTo, env.FACILITATOR_URL);
   const ladder = createLadder({
     db: env.DB,
@@ -17,10 +19,13 @@ function buildNetwork(env: Env, name: "mainnet" | "testnet", payTo: string) {
     net,
     payTo,
     teamWallets: (env.TEAM_WALLETS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    openRefund: ({ session, delivery, tripId }) => openFeeRefund(env.DB, { session, environment, delivery, tripId, now: new Date() }).then(summarize),
   });
-  const domain: Domain = createDomain(env, name === "mainnet" ? "MAINNET" : "TESTNET");
+  const domain: Domain = createDomain(env, environment);
   const deps: NetworkDeps = { net, payTo, ladder, domain: domain.handlers };
-  return { deps, init: () => httpServer.initialize(), net, reconcile: domain.reconcile };
+  const refundMnemonic = name === "testnet" ? env.PAYTO_MNEMONIC_TESTNET : undefined;
+  const reconcile = async (): Promise<number> => (await domain.reconcile()) + (refundMnemonic ? await reconcileRefunds(env.DB, { net, mnemonic: refundMnemonic }, new Date()) : 0);
+  return { deps, init: () => httpServer.initialize(), net, reconcile };
 }
 
 function build(env: Env) {

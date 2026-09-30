@@ -12,6 +12,7 @@ import { publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type Publi
 import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
 import { checkAnchor } from "./anchor";
+import { getRefundBySession, summarize } from "./payments/refunds";
 
 export interface NetworkDeps {
   net: NetworkConfig;
@@ -124,6 +125,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
     app.get(`${prefix}/payments/:id`, async (c) => {
       const s = await getSessionById(db, c.req.param("id"));
       if (!s || s.network !== n.net.caip2) return c.json({ error: "NOT_FOUND" }, 404);
+      const refund = await getRefundBySession(db, s.id);
       return c.json({
         payment_session_id: s.id,
         payment_state: s.state,
@@ -136,6 +138,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         payer_class: s.payer_class,
         confirmed_round: s.confirmed_round,
         operation_id: s.operation_id,
+        refund: refund ? summarize(refund) : null,
         updated_at: s.updated_at,
       });
     });
