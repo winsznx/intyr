@@ -6,6 +6,8 @@ import { ROUTE_PRICES, atomicToUsdc } from "./prices";
 import type { Ladder, PaidRoute } from "./payments/ladder";
 import { getOperation, getSessionById } from "./payments/sessions";
 import { notAvailable, type DomainHandlers, type RouteKey } from "./domain";
+import { mountSandbox } from "./sandbox";
+import { TripStore } from "./domain/store";
 
 export interface NetworkDeps {
   net: NetworkConfig;
@@ -71,7 +73,9 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
     }),
   );
 
+  const store = new TripStore(db);
   const primary = deps.mainnet ?? deps.testnet;
+  if (deps.testnet) mountSandbox(app, { db });
   const nets: NetworkDeps[] = [deps.mainnet, deps.testnet].filter((n): n is NetworkDeps => Boolean(n));
 
   for (const n of nets) {
@@ -111,6 +115,11 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         operation_id: s.operation_id,
         updated_at: s.updated_at,
       });
+    });
+    app.get(`${prefix}/manifests/:id`, async (c) => {
+      const row = await store.getManifest(c.req.param("id"));
+      if (!row || row.network !== n.net.name) return c.json({ error: "NOT_FOUND" }, 404);
+      return c.json({ manifest_id: row.id, kind: row.kind, status: row.status, hash: row.hash, expires_at: row.expires_at, signed: JSON.parse(row.signed_json) });
     });
     app.get(`${prefix}/operations/:id`, async (c) => {
       const op = await getOperation(db, c.req.param("id"));
