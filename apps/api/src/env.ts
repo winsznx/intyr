@@ -17,6 +17,10 @@ export interface Env {
   /** Mnemonics of the small hot anchor accounts, one per network (secrets). */
   ANCHOR_MNEMONIC_MAINNET?: string;
   ANCHOR_MNEMONIC_TESTNET?: string;
+  /** Mnemonic of the TestNet payTo account, used only to send TestNet fee refunds. Never set for Mainnet. */
+  PAYTO_MNEMONIC_TESTNET?: string;
+  /** Milliseconds a request waits for its anchor to confirm before leaving it PENDING for the cron. Default 6000. */
+  ANCHOR_CONFIRM_WAIT_MS?: string;
   DUFFEL_TOKEN?: string;
   LITEAPI_KEY?: string;
 }

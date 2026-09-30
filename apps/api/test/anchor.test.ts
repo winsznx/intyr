@@ -69,7 +69,7 @@ describe("anchorHash", () => {
     expect(ref.state).toBe("PENDING");
     expect(ref.confirmed_round).toBeUndefined();
     expect((await store.getAnchor("man_2"))?.state).toBe("PENDING");
-    expect(await store.listPendingAnchors()).toEqual([{ manifest_id: "man_2", network: "testnet", txid: ref.txid }]);
+    expect(await store.listPendingAnchors()).toMatchObject([{ manifest_id: "man_2", network: "testnet", txid: ref.txid }]);
   });
 
   it("marks the anchor FAILED and throws when algod rejects the transaction", async () => {
@@ -90,6 +90,19 @@ describe("reconcileAnchors", () => {
     expect(await reconcileAnchors(store, net, new Date(), later.fetchFn)).toBe(1);
     expect(await store.getAnchor("man_4")).toMatchObject({ state: "CONFIRMED", round: 512 });
     expect(await reconcileAnchors(store, net, new Date(), later.fetchFn)).toBe(0);
+  });
+});
+
+describe("reconcileAnchors expiry", () => {
+  it("fails an anchor that is still unseen after its validity window and stops polling it", async () => {
+    const store = new TripStore(createTestD1());
+    await anchorHash(signer(chainFake({ confirmAfterPolls: Number.MAX_SAFE_INTEGER }).fetchFn), "man_5", HASH, store);
+    const stillAbsent = chainFake({ confirmAfterPolls: Number.MAX_SAFE_INTEGER }).fetchFn;
+    expect(await reconcileAnchors(store, net, new Date(), stillAbsent)).toBe(0);
+    expect((await store.getAnchor("man_5"))?.state).toBe("PENDING");
+    expect(await reconcileAnchors(store, net, new Date(Date.now() + 2 * 3600_000), stillAbsent)).toBe(1);
+    expect(await store.getAnchor("man_5")).toMatchObject({ state: "FAILED" });
+    expect(await store.listPendingAnchors()).toEqual([]);
   });
 });
 

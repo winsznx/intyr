@@ -1,7 +1,9 @@
 import algosdk from "algosdk";
+import { RejectedError, getSuggestedParams, submitSigned } from "./algod";
 import type { AnchorRef } from "@intyr/core";
 import type { NetworkConfig } from "./config";
 import type { TripStore } from "./domain/store";
+import { updateTripDoc } from "./domain/service/trip-update";
 
 export const ANCHOR_NOTE_PREFIX = "intyr:v1:";
 
@@ -19,29 +21,6 @@ export function noteFor(manifestHash: string): string {
   return ANCHOR_NOTE_PREFIX + manifestHash.replace(/^sha256:/, "");
 }
 
-interface TxParams {
-  fee: number;
-  minFee: number;
-  firstValid: number;
-  lastValid: number;
-  genesisID: string;
-  genesisHash: string;
-}
-
-async function getParams(net: NetworkConfig, fetchFn: typeof fetch): Promise<TxParams> {
-  const res = await fetchFn(`${net.algodUrl}/v2/transactions/params`, { headers: { accept: "application/json" } });
-  if (!res.ok) throw new Error(`algod params ${res.status}`);
-  const p = (await res.json()) as Record<string, unknown>;
-  return {
-    fee: Number(p["fee"] ?? 0),
-    minFee: Number(p["min-fee"] ?? 1000),
-    firstValid: Number(p["last-round"]),
-    lastValid: Number(p["last-round"]) + 1000,
-    genesisID: String(p["genesis-id"]),
-    genesisHash: String(p["genesis-hash"]),
-  };
-}
-
 /**
  * Records a manifest hash on Algorand as the note of a 0-ALGO payment from the anchor account to itself.
  * The transaction proves integrity and timing of the manifest, not that any supplier told the truth.
@@ -51,32 +30,23 @@ export async function anchorHash(signer: AnchorSigner, manifestId: string, manif
   const fetchFn = signer.fetchFn ?? fetch;
   const sleep = signer.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const account = algosdk.mnemonicToSecretKey(signer.mnemonic);
-  const params = await getParams(signer.net, fetchFn);
+  const suggestedParams = await getSuggestedParams(signer.net, fetchFn);
   const note = noteFor(manifestHash);
   const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
     sender: account.addr,
     receiver: account.addr,
     amount: 0,
     note: new TextEncoder().encode(note),
-    suggestedParams: {
-      fee: params.fee,
-      flatFee: false,
-      minFee: params.minFee,
-      firstValid: params.firstValid,
-      lastValid: params.lastValid,
-      genesisID: params.genesisID,
-      genesisHash: Uint8Array.from(atob(params.genesisHash), (c) => c.charCodeAt(0)),
-    },
+    suggestedParams,
   });
   const txid = txn.txID();
   const now = new Date().toISOString();
   await store?.putAnchor({ manifest_id: manifestId, network: signer.net.name, mode: "SEPARATE_NOTE_TRANSACTION", txid, state: "SUBMITTED", now });
-  const signed = txn.signTxn(account.sk);
-  const res = await fetchFn(`${signer.net.algodUrl}/v2/transactions`, { method: "POST", headers: { "content-type": "application/x-binary" }, body: signed });
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 300);
-    await store?.updateAnchor(manifestId, { state: "FAILED", error: detail, now: new Date().toISOString() });
-    throw new Error(`anchor submit failed: ${res.status} ${detail}`);
+  try {
+    await submitSigned(signer.net, txn.signTxn(account.sk), fetchFn);
+  } catch (e) {
+    if (e instanceof RejectedError) await store?.updateAnchor(manifestId, { state: "FAILED", error: e.message, now: new Date().toISOString() });
+    throw new Error(`anchor submit failed: ${e instanceof Error ? e.message : String(e)}`);
   }
   const deadline = Date.now() + (signer.confirmWaitMs ?? 6000);
   for (;;) {
@@ -137,9 +107,22 @@ export async function checkAnchor(net: NetworkConfig, txid: string | null, manif
   }
 }
 
+/** A transaction is valid for about 47 minutes, so one that is still unseen an hour later can never confirm. */
+const ANCHOR_EXPIRY_MS = 60 * 60_000;
+
+/** Mirrors a settled anchor into the trip document that shows it, so a trip never keeps reading PENDING. */
+async function syncTripAnchor(store: TripStore, manifestId: string, txid: string, state: "CONFIRMED" | "FAILED", now: string): Promise<void> {
+  const manifest = await store.getManifest(manifestId);
+  if (!manifest?.trip_id) return;
+  await updateTripDoc(store, manifest.trip_id, now, (doc) => {
+    if (doc.manifest_id !== manifestId && doc.final_manifest_id !== manifestId) return;
+    doc.anchor = { state, txid, mode: doc.anchor?.mode ?? "SEPARATE_NOTE_TRANSACTION" };
+  });
+}
+
 /**
- * Cron step: settles anchors that were submitted but not seen in a block when their request ended.
- * An anchor that is still absent long after its validity window is marked FAILED so it stops being polled.
+ * Cron step: settles anchors that were submitted but not seen in a block when their request ended. Each poll touches
+ * the row so a stuck anchor cannot starve newer ones, and an anchor unseen past its validity window is marked FAILED.
  */
 export async function reconcileAnchors(store: TripStore, net: NetworkConfig, now: Date, fetchFn: typeof fetch = fetch): Promise<number> {
   const pending = (await store.listPendingAnchors(20)).filter((a) => a.network === net.name);
@@ -148,7 +131,14 @@ export async function reconcileAnchors(store: TripStore, net: NetworkConfig, now
     const round = await confirmedRound(net, a.txid, fetchFn);
     if (round !== null) {
       await store.updateAnchor(a.manifest_id, { state: "CONFIRMED", round, now: now.toISOString() });
+      await syncTripAnchor(store, a.manifest_id, a.txid, "CONFIRMED", now.toISOString());
       settled++;
+    } else if (now.getTime() - Date.parse(a.created_at) > ANCHOR_EXPIRY_MS) {
+      await store.updateAnchor(a.manifest_id, { state: "FAILED", error: "not seen on chain within its validity window", now: now.toISOString() });
+      await syncTripAnchor(store, a.manifest_id, a.txid, "FAILED", now.toISOString());
+      settled++;
+    } else {
+      await store.updateAnchor(a.manifest_id, { state: "PENDING", now: now.toISOString() });
     }
   }
   return settled;

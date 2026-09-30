@@ -10,6 +10,12 @@ export class D1SimulatorStore implements SimulatorStore {
     return row?.v ?? null;
   }
 
+  async list(prefix: string): Promise<Array<{ key: string; value: string }>> {
+    const upper = prefix.slice(0, -1) + String.fromCharCode(prefix.charCodeAt(prefix.length - 1) + 1);
+    const rows = await this.db.prepare("SELECT k, v FROM sim_kv WHERE k >= ?1 AND k < ?2 ORDER BY k").bind(prefix, upper).all<{ k: string; v: string }>();
+    return (rows.results ?? []).map((r) => ({ key: r.k, value: r.v }));
+  }
+
   async put(key: string, value: string): Promise<void> {
     await this.db
       .prepare("INSERT INTO sim_kv (k, v, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT(k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at")

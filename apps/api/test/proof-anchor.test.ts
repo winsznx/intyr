@@ -4,6 +4,8 @@ import { generateSigningKey } from "@intyr/core";
 import type { Env } from "../src/env";
 import { createApp } from "../src/app";
 import { networkConfig } from "../src/config";
+import { reconcileAnchors } from "../src/anchor";
+import { TripStore } from "../src/domain/store";
 import { createTestD1 } from "./support/d1";
 
 const genesisHash = btoa(String.fromCharCode(...new Uint8Array(32).fill(3)));
@@ -39,6 +41,7 @@ async function anchoredApp() {
     PAY_TO_TESTNET: "PAYTO",
     MANIFEST_SIGNING_JWK: JSON.stringify(pair.privateJwk),
     ANCHOR_MNEMONIC_TESTNET: algosdk.secretKeyToMnemonic(account.sk),
+    ANCHOR_CONFIRM_WAIT_MS: "0",
   } as unknown as Env;
   const net = networkConfig("testnet");
   const app = createApp({ env, version: { name: "t", commit: "t", contract_versions: {} }, testnet: { net, payTo: "PAYTO", ladder: (() => new Response("no")) as never, domain: {} } });
@@ -71,5 +74,24 @@ describe("anchored proof", () => {
     const trip = (await (await app.request(`https://x.test/sandbox/v1/trips/${run.trip_id}`, { headers: { cookie } })).json()) as { final_manifest_id: string };
     const verified = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ manifest_id: trip.final_manifest_id }) })).json()) as { proof_state: string; integrity: string };
     expect(verified).toMatchObject({ integrity: "VALID", proof_state: "PROOF_PARTIAL" });
+  });
+});
+
+describe("pending anchor", () => {
+  it("settles into the trip document when the cron later sees the transaction", async () => {
+    const chain = installChain();
+    const { app, cookie, db } = await anchoredApp();
+    const real = globalThis.fetch;
+    // The pending poll fails during the request, so the anchor is left PENDING.
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => (String(input).includes("/pending/") ? new Response("{}", { status: 404 }) : real(input, init)));
+    const run = (await (await app.request("https://x.test/sandbox/v1/demo/run", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ scenario: "happy", seed: 5 }) })).json()) as { trip_id: string };
+    const before = (await (await app.request(`https://x.test/sandbox/v1/trips/${run.trip_id}`, { headers: { cookie } })).json()) as { anchor: { state: string } };
+    expect(before.anchor.state).toBe("PENDING");
+
+    vi.stubGlobal("fetch", real);
+    expect(chain.notes.size).toBeGreaterThan(0);
+    expect(await reconcileAnchors(new TripStore(db), networkConfig("testnet"), new Date())).toBeGreaterThan(0);
+    const after = (await (await app.request(`https://x.test/sandbox/v1/trips/${run.trip_id}`, { headers: { cookie } })).json()) as { anchor: { state: string; txid: string } };
+    expect(after.anchor.state).toBe("CONFIRMED");
   });
 });

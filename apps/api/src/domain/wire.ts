@@ -44,7 +44,7 @@ export function buildServiceDeps(env: Env, environment: Environment): ServiceDep
     environment,
     allowScenario: environment === "TESTNET",
     now: () => new Date(),
-    ...(mnemonic ? { anchor: (manifestId: string, hash: string) => anchorHash({ net, mnemonic }, manifestId, hash, store) } : {}),
+    ...(mnemonic ? { anchor: (manifestId: string, hash: string) => anchorHash({ net, mnemonic, ...(env.ANCHOR_CONFIRM_WAIT_MS ? { confirmWaitMs: Number(env.ANCHOR_CONFIRM_WAIT_MS) } : {}) }, manifestId, hash, store) } : {}),
   };
 }
 

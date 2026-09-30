@@ -213,8 +213,8 @@ export class TripStore {
     return this.db.prepare("SELECT * FROM anchors WHERE manifest_id = ?1").bind(manifestId).first();
   }
 
-  async listPendingAnchors(limit = 20): Promise<Array<{ manifest_id: string; network: string; txid: string }>> {
-    const r = await this.db.prepare("SELECT manifest_id, network, txid FROM anchors WHERE state IN ('SUBMITTED','PENDING') AND txid IS NOT NULL ORDER BY updated_at LIMIT ?1").bind(limit).all<{ manifest_id: string; network: string; txid: string }>();
+  async listPendingAnchors(limit = 20): Promise<Array<{ manifest_id: string; network: string; txid: string; created_at: string }>> {
+    const r = await this.db.prepare("SELECT manifest_id, network, txid, created_at FROM anchors WHERE state IN ('SUBMITTED','PENDING') AND txid IS NOT NULL ORDER BY updated_at LIMIT ?1").bind(limit).all<{ manifest_id: string; network: string; txid: string; created_at: string }>();
     return r.results ?? [];
   }
 
