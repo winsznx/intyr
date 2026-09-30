@@ -7,7 +7,8 @@
  * kernel to move a component to CONFIRMED.
  */
 
-export type ComponentType = "FLIGHT" | "HOTEL" | "GROUND";
+/** ESIM and DATA are legs bought from x402 merchants (a travel eSIM, an FX rate for the trip). */
+export type ComponentType = "FLIGHT" | "HOTEL" | "GROUND" | "ESIM" | "DATA";
 
 export type AdapterId =
   | "duffel-flights"

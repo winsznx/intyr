@@ -4,8 +4,11 @@ import type { ComponentClocks, FetchLike, Money, SupplierRefs } from "./contract
 
 const ZERO_DECIMAL = new Set(["JPY", "KRW", "VND", "CLP", "ISK", "HUF", "XOF", "XAF"]);
 
+/** USDC amounts keep all six decimals, so sub-cent x402 prices stay exact. */
 function exponent(currency: string): number {
-  return ZERO_DECIMAL.has(currency.toUpperCase()) ? 0 : 2;
+  const code = currency.toUpperCase();
+  if (code === "USDC") return 6;
+  return ZERO_DECIMAL.has(code) ? 0 : 2;
 }
 
 /** Converts a supplier decimal amount ("123.45" or 123.45) to integer minor units. */

@@ -10,6 +10,7 @@ export { DuffelFlightsAdapter, type DuffelOptions } from "./duffel";
 export { LiteApiHotelsAdapter, type LiteApiOptions } from "./liteapi";
 export { MemorySimulatorStore, SimulatorAdapter, type SimOrder, type SimOrderStatus, type SimulatorOptions, type SimulatorStore } from "./simulator";
 export { toDecimal, toMoney } from "./util";
+export { parsePaymentRequired, X402MerchantAdapter, type MerchantCatalogEntry, type PaymentRequirement, type X402MerchantOptions } from "./x402-merchant";
 
 export interface AdapterEnv {
   DUFFEL_TOKEN?: string;

@@ -52,6 +52,8 @@ function component(type: ComponentType, index: number, scenario: SimScenario, se
       return { component_id: id, type, check_in: "2026-11-12", check_out: "2026-11-15", adults: 1, currency: "USD", sim };
     case "GROUND":
       return { component_id: id, type, origin: "JFK", destination: "Midtown Manhattan", depart_date: "2026-11-12", adults: 1, currency: "USD", sim };
+    default:
+      throw new Error(`campaign shapes do not include ${type}`);
   }
 }
 
