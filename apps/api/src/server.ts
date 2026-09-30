@@ -5,41 +5,66 @@ import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/
 import { CHALLENGE_TAG, routePrefix, type NetworkConfig } from "./config";
 import { ROUTE_PRICES } from "./prices";
 
-const EXAMPLE_BODIES: Record<string, { input: Record<string, unknown>; output: Record<string, unknown> }> = {
+const EXAMPLE_HASH = `sha256:${"0".repeat(64)}`;
+
+/**
+ * Request bodies shown to Bazaar and discovery clients. Each one has to parse with its route's schema, because the
+ * resource refresh sends the example first and a rejected example reads as a broken route.
+ */
+export const EXAMPLE_BODIES: Record<string, { input: Record<string, unknown>; output: Record<string, unknown> }> = {
   "POST /v1/trips/check": {
     input: {
+      currency: "USD",
       legs: [
         {
           leg_id: "hotel-1",
           type: "HOTEL",
           supplier: "example-hotels",
+          offer_ref: "offer-hotel-001",
           price: { amount_minor: 41000, currency: "USD" },
+          preparation_mode: "REVALIDATED",
           refundable: true,
-          free_cancel_until: "2026-11-01T12:00:00Z",
-          price_valid_until: "2026-10-05T12:00:00Z",
+          clocks: { price_valid_until: "2026-10-05T12:00:00Z", free_cancel_until: "2026-11-01T12:00:00Z", refund_destination: "CASH", refund_amount_certainty: "QUOTED", supplier_can_cancel: true },
         },
         {
           leg_id: "flight-1",
           type: "FLIGHT",
           supplier: "example-airline",
+          offer_ref: "offer-flight-001",
           price: { amount_minor: 52000, currency: "USD" },
+          preparation_mode: "INSTANT_COMMIT_ONLY",
           refundable: false,
-          price_valid_until: "2026-10-05T12:30:00Z",
-          requires_instant_payment: true,
+          clocks: { price_valid_until: "2026-10-05T12:30:00Z" },
+          depends_on: ["hotel-1"],
         },
       ],
-      budget: { total_minor: 100000, currency: "USD" },
-      max_price_movement_pct: 2,
+      limits: { max_total_minor: 100000 },
     },
-    output: { plan_id: "man_example", verdict: "COMMIT_NOW", commit_order: ["hotel-1", "flight-1"], payment_state: "CONFIRMED" },
+    output: { plan_id: "pln_example", verdict: "COMMIT_NOW", commit_order: ["hotel-1", "flight-1"], payment_state: "CONFIRMED" },
   },
   "POST /v1/trips/prepare": {
-    input: { legs: [{ type: "FLIGHT", origin: "JFK", destination: "EWR", date: "2026-11-01", adults: 1 }], budget: { total_minor: 100000, currency: "USD" } },
-    output: { trip_id: "trp_example", state: "PREPARED", manifest_id: "man_example" },
+    input: {
+      currency: "EUR",
+      budget_total_minor: 150000,
+      components: [
+        { type: "FLIGHT", origin: "JFK", destination: "LHR", depart_date: "2026-11-10", passengers: 1 },
+        { type: "HOTEL", city: "London", check_in: "2026-11-10", check_out: "2026-11-12", guests: 1 },
+      ],
+    },
+    output: { trip_id: "trp_0123456789abcdef01234567", state: "PREPARED", manifest_id: "man_example" },
   },
-  "POST /v1/trips/revalidate": { input: { trip_id: "trp_example" }, output: { trip_id: "trp_example", state: "READY_TO_COMMIT", manifest_changed: false } },
-  "POST /v1/trips/commit": { input: { trip_id: "trp_example", manifest_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000" }, output: { trip_id: "trp_example", state: "COMMITTED" } },
-  "POST /v1/trips/recover": { input: { trip_id: "trp_example" }, output: { trip_id: "trp_example", state: "RECOVERED" } },
+  "POST /v1/trips/revalidate": {
+    input: { trip_id: "trp_0123456789abcdef01234567" },
+    output: { trip_id: "trp_0123456789abcdef01234567", state: "PREPARED", manifest_changed: false },
+  },
+  "POST /v1/trips/commit": {
+    input: { trip_id: "trp_0123456789abcdef01234567", manifest_id: "man_example", manifest_hash: EXAMPLE_HASH, maximum_total_minor: 100000, currency: "USD", recovery_policy_acknowledged: true },
+    output: { trip_id: "trp_0123456789abcdef01234567", state: "COMMITTED" },
+  },
+  "POST /v1/trips/recover": {
+    input: { trip_id: "trp_0123456789abcdef01234567", allow_replacement: true, replacement_headroom_minor: 0 },
+    output: { trip_id: "trp_0123456789abcdef01234567", state: "RECOVERED" },
+  },
 };
 
 export function buildRoutes(net: NetworkConfig, payTo: string): Record<string, RouteConfig> {

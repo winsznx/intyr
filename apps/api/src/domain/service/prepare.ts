@@ -39,6 +39,9 @@ export function parseCheck(body: unknown): ParseResult<CheckRequest> {
   return parseWith(CheckRequestSchema, body);
 }
 
+/** Component types a wired adapter can prepare. ESIM and DATA need the x402 merchant adapter, which this release does not wire. */
+export const SUPPORTED_COMPONENT_TYPES: readonly string[] = ["FLIGHT", "HOTEL", "GROUND"];
+
 export function parseIntent(body: unknown): ParseResult<PublicTripIntent> {
   return parseWith(PublicTripIntentSchema, body);
 }

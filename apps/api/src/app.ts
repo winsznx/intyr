@@ -8,7 +8,7 @@ import { getOperation, getSessionById } from "./payments/sessions";
 import { notAvailable, type DomainHandlers, type RouteKey } from "./domain";
 import { mountSandbox, mountSandboxActions } from "./sandbox";
 import { KEY_ID, KEY_VALID_FROM, buildServiceDeps } from "./domain/wire";
-import { integrityProofState, publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type CommitManifest, type TransactionManifest } from "@intyr/core";
+import { integrityProofState, publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type SignedRecord } from "@intyr/core";
 import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
 import { checkAnchor } from "./anchor";
@@ -117,7 +117,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         environment: n.net.name.toUpperCase(),
         entry_type: "composite",
         assurance: { mode: "NONE" },
-        leg_classes: ["CALLER_SUPPLIED", "SUPPLIER_SANDBOX", "SIMULATED", "X402_MERCHANT"],
+        leg_classes: ["CALLER_SUPPLIED", "SUPPLIER_SANDBOX", "SIMULATED"],
         preparation_modes: ["HARD_HOLD", "SOFT_HOLD", "REVALIDATED", "INSTANT_COMMIT_ONLY", "UNSUPPORTED"],
         decision_outcomes: ["ACT", "NO_ACTION", "UNKNOWN", "REFUSE", "MANUAL_REVIEW"],
         routes: pricesPayload(n).routes,
@@ -207,12 +207,13 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         if (row) signed = JSON.parse(row.signed_json);
       }
       if (!signed || typeof signed !== "object") return c.json({ error: "INVALID_REQUEST", message: "Send {signed} or {manifest_id}." }, 422);
-      const result = await verifyManifestDocument(signed as Signed<CommitManifest | TransactionManifest>, keys);
+      const result = await verifyManifestDocument(signed as Signed<SignedRecord>, keys);
       if (!result.ok) {
         return c.json({ proof_state: integrityProofState(result), integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root", "decisions_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
       }
-      const doc = signed as Signed<CommitManifest | TransactionManifest>;
-      const anchorRow = await store.getAnchor(doc.payload.manifest_id);
+      const doc = signed as Signed<SignedRecord>;
+      const recordId = "plan_id" in doc.payload ? doc.payload.plan_id : doc.payload.manifest_id;
+      const anchorRow = await store.getAnchor(recordId);
       const anchor = anchorRow && anchorRow.network === n.net.name ? await checkAnchor(n.net, anchorRow.txid, doc.payload_hash) : ({ state: "ANCHOR_NOT_FOUND" } as const);
       const proof_state = anchor.state === "ANCHOR_CONFIRMED" ? "PROOF_VERIFIED" : anchor.state === "HASH_MISMATCH" ? "HASH_MISMATCH" : "PROOF_PARTIAL";
       return c.json({

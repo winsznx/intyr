@@ -5,7 +5,7 @@ import type { DomainHandlers } from "./index";
 import { createAdapterRegistry } from "./adapters";
 import { TripStore } from "./store";
 import type { ServiceDeps } from "./service/context";
-import { parseCheck, parseIntent, invalid, precheckRevalidate, runCheck, runPrepare, runRevalidate, tripOwner } from "./service/prepare";
+import { SUPPORTED_COMPONENT_TYPES, parseCheck, parseIntent, invalid, precheckRevalidate, runCheck, runPrepare, runRevalidate, tripOwner } from "./service/prepare";
 import { precheckCommit, reconcileUnknownTrips, runCommit } from "./service/commit";
 import type { PaymentSession } from "../payments/sessions";
 import { anchorHash, reconcileAnchors } from "../anchor";
@@ -80,6 +80,10 @@ export function createDomain(env: Env, environment: Environment): Domain {
         if (!p.ok) return invalid(p.issues);
         if (p.value.scenario && !deps.allowScenario) {
           return { status: 422, body: { error: "SCENARIO_NOT_ALLOWED", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], message: "Seeded fault scenarios are accepted on the sandbox host only.", charged: false } };
+        }
+        const unsupported = p.value.components.flatMap((c, i) => (SUPPORTED_COMPONENT_TYPES.includes(c.type) ? [] : [{ path: `components.${i}.type`, message: `${c.type} is not available in this release` }]));
+        if (unsupported.length > 0) {
+          return { status: 422, body: { error: "UNSUPPORTED_COMPONENT", outcome: "REFUSE", reason_codes: ["UNSUPPORTED_PREPARATION_MODE"], issues: unsupported, charged: false } };
         }
         return null;
       },
