@@ -1,5 +1,5 @@
 import algosdk from "algosdk";
-import { RejectedError, getSuggestedParams, submitSigned } from "./algod";
+import { RejectedError, chainFetch, getSuggestedParams, submitSigned } from "./algod";
 import type { AnchorRef } from "@intyr/core";
 import type { NetworkConfig } from "./config";
 import type { TripStore } from "./domain/store";
@@ -27,7 +27,7 @@ export function noteFor(manifestHash: string): string {
  * The txid is returned as soon as the transaction is accepted; confirmation is awaited briefly and otherwise left PENDING.
  */
 export async function anchorHash(signer: AnchorSigner, manifestId: string, manifestHash: string, store?: TripStore): Promise<AnchorRef & { state: "CONFIRMED" | "PENDING" }> {
-  const fetchFn = signer.fetchFn ?? fetch;
+  const fetchFn = signer.fetchFn ?? chainFetch;
   const sleep = signer.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const account = algosdk.mnemonicToSecretKey(signer.mnemonic);
   const suggestedParams = await getSuggestedParams(signer.net, fetchFn);
@@ -63,7 +63,7 @@ export async function anchorHash(signer: AnchorSigner, manifestId: string, manif
 }
 
 /** Confirmed round of a transaction, or null when it is not (yet) in a block. */
-export async function confirmedRound(net: NetworkConfig, txid: string, fetchFn: typeof fetch = fetch, opts: { indexer?: boolean } = {}): Promise<number | null> {
+export async function confirmedRound(net: NetworkConfig, txid: string, fetchFn: typeof fetch = chainFetch, opts: { indexer?: boolean } = {}): Promise<number | null> {
   try {
     const res = await fetchFn(`${net.algodUrl}/v2/transactions/pending/${txid}`, { headers: { accept: "application/json" } });
     if (res.ok) {
@@ -91,7 +91,7 @@ export type AnchorCheck =
   | { state: "HASH_MISMATCH"; txid: string };
 
 /** Reads the anchor transaction from a public indexer and checks that its note carries the manifest hash. */
-export async function checkAnchor(net: NetworkConfig, txid: string | null, manifestHash: string, fetchFn: typeof fetch = fetch): Promise<AnchorCheck> {
+export async function checkAnchor(net: NetworkConfig, txid: string | null, manifestHash: string, fetchFn: typeof fetch = chainFetch): Promise<AnchorCheck> {
   if (!txid) return { state: "ANCHOR_NOT_FOUND" };
   try {
     const res = await fetchFn(`${net.indexerUrl}/v2/transactions/${txid}`, { headers: { accept: "application/json" } });
@@ -124,7 +124,7 @@ async function syncTripAnchor(store: TripStore, manifestId: string, txid: string
  * Cron step: settles anchors that were submitted but not seen in a block when their request ended. Each poll touches
  * the row so a stuck anchor cannot starve newer ones, and an anchor unseen past its validity window is marked FAILED.
  */
-export async function reconcileAnchors(store: TripStore, net: NetworkConfig, now: Date, fetchFn: typeof fetch = fetch): Promise<number> {
+export async function reconcileAnchors(store: TripStore, net: NetworkConfig, now: Date, fetchFn: typeof fetch = chainFetch): Promise<number> {
   const pending = (await store.listPendingAnchors(20)).filter((a) => a.network === net.name);
   let settled = 0;
   for (const a of pending) {

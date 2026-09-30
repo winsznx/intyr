@@ -1,6 +1,6 @@
 import algosdk from "algosdk";
 import { PUBLIC_DEFAULT_POLICY, decideRefund, newId, type Environment, type GateDecision } from "@intyr/core";
-import { RejectedError, getSuggestedParams, submitSigned } from "../algod";
+import { RejectedError, chainFetch, getSuggestedParams, submitSigned } from "../algod";
 import type { NetworkConfig } from "../config";
 import { readPaymentTx } from "./chain";
 import { WORK_STATES, getSessionById, type PaymentSession } from "./sessions";
@@ -107,7 +107,7 @@ async function rowsIn(db: D1Database, states: RefundState[], network: string): P
  * without the transaction appearing, at which point it can never confirm.
  */
 export async function settleSubmittedRefunds(db: D1Database, signer: RefundSigner, now: Date): Promise<number> {
-  const fetchFn = signer.fetchFn ?? fetch;
+  const fetchFn = signer.fetchFn ?? chainFetch;
   let settled = 0;
   for (const row of await rowsIn(db, ["SUBMITTED", "UNKNOWN"], signer.net.caip2)) {
     if (!row.txid) continue;
@@ -131,7 +131,7 @@ export async function settleSubmittedRefunds(db: D1Database, signer: RefundSigne
  */
 export async function executeRefunds(db: D1Database, signer: RefundSigner, now: Date): Promise<number> {
   if (signer.net.name !== "testnet") return 0;
-  const fetchFn = signer.fetchFn ?? fetch;
+  const fetchFn = signer.fetchFn ?? chainFetch;
   const account = algosdk.mnemonicToSecretKey(signer.mnemonic);
   let sent = 0;
   for (const row of await rowsIn(db, ["REQUESTED"], signer.net.caip2)) {

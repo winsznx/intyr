@@ -1,4 +1,5 @@
 import algosdk from "algosdk";
+import { chainFetch } from "../algod";
 import type { NetworkConfig } from "../config";
 
 /** What an independent node says about a payment transaction. */
@@ -21,7 +22,7 @@ interface IndexerTxn {
 export async function readPaymentTx(
   net: NetworkConfig,
   txid: string,
-  fetchFn: typeof fetch = fetch,
+  fetchFn: typeof fetch = chainFetch,
 ): Promise<ChainReading> {
   try {
     const res = await fetchFn(`${net.indexerUrl}/v2/transactions/${txid}`, { headers: { accept: "application/json" } });

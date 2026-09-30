@@ -6,6 +6,7 @@ import {
 } from "@x402/core/http";
 import type { x402HTTPResourceServer } from "@x402/core/server";
 import { canonicalize, hashValue } from "@intyr/core";
+import { chainFetch } from "../algod";
 import { readBodyWithLimit } from "../body";
 import { routePrefix, type NetworkConfig } from "../config";
 import type { FeeFailure, RefundSummary } from "./refunds";
@@ -111,7 +112,7 @@ function pollUrl(origin: string, net: NetworkConfig, session: PaymentSession): s
  */
 export function createLadder(deps: LadderDeps) {
   const now = deps.now ?? (() => new Date().toISOString());
-  const fetchFn = deps.fetchFn ?? fetch;
+  const fetchFn = deps.fetchFn ?? chainFetch;
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   async function resolveByChain(session: PaymentSession, decoded: { lastValid: number }): Promise<PaymentState | "PENDING"> {
@@ -410,7 +411,7 @@ export async function reconcileSession(
   session: PaymentSession,
 ): Promise<PaymentState | "PENDING"> {
   const now = deps.now ?? (() => new Date().toISOString());
-  const reading = await readPaymentTx(deps.net, session.txid, deps.fetchFn ?? fetch);
+  const reading = await readPaymentTx(deps.net, session.txid, deps.fetchFn ?? chainFetch);
   const at = now();
   if (reading.status === "confirmed") {
     const from = ["UNKNOWN", "SETTLE_FAILED", "SETTLE_SUBMITTED", "PROOF_RECEIVED"] as const;
