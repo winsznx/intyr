@@ -61,7 +61,8 @@ The verifier checks the Ed25519 signature against the published key at
 `/.well-known/intyr-signing-keys.json` and recomputes the payload hash and Merkle roots. It then reads the
 anchor note and every listed USDC payment from public Algorand nodes. It never asks Intyr's server whether a
 record is valid. Pass `--key` to pin the key from a source you trust, and `--json` for the full report. It
-exits 0 only for `PROOF_VERIFIED`.
+exits 0 only for `PROOF_VERIFIED`. The public page `/verify/<manifest_id>` runs the same verifier in your
+browser against Algorand.
 
 A verified record shows that Intyr signed exactly this content, that it existed unchanged at the anchor round,
 and that the listed payments happened as recorded. It does not show that a supplier kept a booking, or that
