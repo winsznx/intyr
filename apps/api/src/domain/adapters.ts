@@ -24,9 +24,15 @@ export class D1SimulatorStore implements SimulatorStore {
   }
 }
 
+/**
+ * How long a simulated booking stays invisible after a timed-out commit. A live Worker needs a few seconds between the
+ * commit call and the first read, so anything shorter makes a timeout resolve inside the same request and hides the unknown state.
+ */
+export const SIMULATOR_LAG_SECONDS = 20;
+
 export function createAdapterRegistry(env: Env): AdapterRegistry {
   return createAdapters(
     { DUFFEL_TOKEN: env.DUFFEL_TOKEN, LITEAPI_KEY: env.LITEAPI_KEY },
-    { simulatorStore: new D1SimulatorStore(env.DB), fetch: (input, init) => fetch(input, init) },
+    { simulatorStore: new D1SimulatorStore(env.DB), simulatorLagSeconds: SIMULATOR_LAG_SECONDS, fetch: (input, init) => fetch(input, init) },
   );
 }

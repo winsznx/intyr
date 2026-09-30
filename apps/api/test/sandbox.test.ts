@@ -82,6 +82,19 @@ describe("sandbox demo and approval", () => {
     expect(list.items.map((i) => i.trip_id)).toContain(body.trip_id);
   });
 
+  it("gives every demo run its own seed, so runs never share simulator state, and pauses a timed-out hotel as unknown", async () => {
+    const { app, cookie } = await appWithService();
+    const run = async (scenario: string) =>
+      (await (await app.request("https://x.test/sandbox/v1/demo/run", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ scenario }) })).json()) as { seed: number; final_state: string };
+    const first = await run("timeout-hotel");
+    const second = await run("rejected-flight");
+    expect(first.seed).not.toBe(second.seed);
+    expect(first.final_state).toBe("COMMIT_STATUS_UNKNOWN");
+    expect(second.final_state).toBe("RECOVERED");
+    const explicit = (await (await app.request("https://x.test/sandbox/v1/demo/run", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ scenario: "happy", seed: 123 }) })).json()) as { seed: number };
+    expect(explicit.seed).toBe(123);
+  });
+
   it("requires a session for demo runs and refuses a stale approval hash with the current manifest", async () => {
     const { app, cookie } = await appWithService();
     const anon = await app.request("https://x.test/sandbox/v1/demo/run", { method: "POST" });

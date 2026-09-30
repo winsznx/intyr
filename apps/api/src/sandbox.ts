@@ -102,8 +102,13 @@ const DEMO_IDS = ["happy", "rejected-flight", "timeout-hotel", "refuse-irreversi
 
 const DemoBodySchema = z.object({
   scenario: z.enum(DEMO_IDS).default("rejected-flight"),
-  seed: z.number().int().nonnegative().max(2 ** 31 - 1).default(7),
+  seed: z.number().int().nonnegative().max(2 ** 31 - 1).optional(),
 });
+
+/** A fresh seed per run. The simulator keeps its state per seed, so two runs sharing one would see each other's offers and orders. */
+function freshSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0]! % 2 ** 31;
+}
 
 function sandboxCtx(sessionId: string, operationId: string): PaidContext {
   return { network: "testnet", sponsored: true, sandboxSessionId: sessionId, body: {}, session: null, operationId, now: new Date().toISOString() };
@@ -158,7 +163,8 @@ export function mountSandboxActions(app: Hono<{ Bindings: Env }>, deps: { db: D1
     if (!service) return c.json({ error: "NOT_AVAILABLE", message: "The signing key is not configured." }, 503);
     const parsed = DemoBodySchema.safeParse(await c.req.json().catch(() => ({})));
     if (!parsed.success) return c.json({ error: "INVALID_REQUEST" }, 422);
-    const { scenario, seed } = parsed.data;
+    const { scenario } = parsed.data;
+    const seed = parsed.data.seed ?? freshSeed();
     const since = new Date(clock().getTime() - 3600_000).toISOString();
     const used = await deps.db.prepare("SELECT COUNT(*) AS n FROM sponsored_calls WHERE sandbox_session_id = ?1 AND at >= ?2").bind(session.id, since).first<{ n: number }>();
     if ((used?.n ?? 0) >= 40) return c.json({ error: "RATE_LIMITED", message: "Demo runs are limited per hour." }, 429);
@@ -189,6 +195,6 @@ export function mountSandboxActions(app: Hono<{ Bindings: Env }>, deps: { db: D1
       recovery_policy_acknowledged: true as const,
     };
     const commit = await runCommit(commitBody, sandboxCtx(session.id, `demo_commit_${seed}`), service);
-    return c.json({ run_id: prep.tripId, trip_id: prep.tripId, scenario, label: DEMO_SCENARIOS[scenario].label, final_state: commit.body.state, outcome: commit.body.outcome, note: "Sandbox run. Suppliers are seeded simulators. No USDC moved." });
+    return c.json({ run_id: prep.tripId, trip_id: prep.tripId, scenario, seed, label: DEMO_SCENARIOS[scenario].label, final_state: commit.body.state, outcome: commit.body.outcome, note: "Sandbox run. Suppliers are seeded simulators. No USDC moved." });
   });
 }
