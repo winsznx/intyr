@@ -1,8 +1,27 @@
+import {
+  CheckRequestSchema,
+  CommitRequestSchema,
+  parseWith,
+  PublicTripIntentSchema,
+  RecoverRequestSchema,
+  RevalidateRequestSchema,
+} from "@intyr/core";
 import { NETWORKS, networkByCaip2, type FetchLike } from "@intyr/chain";
 
 /** The most a stock `x402Client` 2.28.0 pays without `spendControls`, in USDC atomic units. */
 export const STOCK_CLIENT_MAX_ATOMIC = 1_000_000;
 export const CHALLENGE_TAG = "x402-global-challenge";
+
+type RouteSchema = Parameters<typeof parseWith>[0];
+
+/** Request schema of each paid route, keyed by the last path segment. */
+export const ROUTE_SCHEMAS: Readonly<Record<string, RouteSchema>> = {
+  check: CheckRequestSchema,
+  prepare: PublicTripIntentSchema,
+  revalidate: RevalidateRequestSchema,
+  commit: CommitRequestSchema,
+  recover: RecoverRequestSchema,
+};
 
 interface Accept {
   scheme?: string;
@@ -16,25 +35,19 @@ interface Accept {
 interface PaymentRequired {
   x402Version?: number;
   accepts?: Accept[];
-  extensions?: { bazaar?: unknown };
+  extensions?: { bazaar?: { info?: { input?: { body?: unknown } } } };
 }
 
 export interface RouteProbe {
   method: "POST" | "GET";
   url: string;
-  body?: unknown;
-  /**
-   * The probe names no real trip, so a trip-bound route must refuse with
-   * `charged: false` before it issues a 402. A 402 here would charge for a
-   * request that cannot succeed.
-   */
-  expectRefusalBeforeCharge?: boolean;
+  /** Schema the route's Bazaar example body must satisfy. */
+  schema?: RouteSchema;
 }
 
 export type ChallengeProblem =
+  | "REFUSES_BEFORE_402"
   | "NOT_402"
-  | "CHARGES_BEFORE_TRIP_CHECK"
-  | "NO_UNCHARGED_REFUSAL"
   | "NO_PAYMENT_REQUIRED_HEADER"
   | "UNREADABLE_HEADER"
   | "NOT_X402_V2"
@@ -46,23 +59,21 @@ export type ChallengeProblem =
   | "PAY_TO_DIFFERS"
   | "MISSING_CHALLENGE_TAG"
   | "MISSING_FEE_PAYER"
-  | "MISSING_BAZAAR_DECLARATION";
+  | "MISSING_BAZAAR_DECLARATION"
+  | "BAZAAR_EXAMPLE_INVALID";
 
 export interface ChallengeCheck {
   url: string;
   status: number;
   ok: boolean;
   problems: ChallengeProblem[];
-  /** True when the route refused before charging instead of issuing a 402. */
-  refusedBeforeCharge?: boolean;
   amount?: string;
   payTo?: string;
 }
 
 function decodeHeader(value: string): PaymentRequired | null {
   try {
-    const bin = atob(value);
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
     return JSON.parse(new TextDecoder().decode(bytes)) as PaymentRequired;
   } catch {
     return null;
@@ -70,30 +81,24 @@ function decodeHeader(value: string): PaymentRequired | null {
 }
 
 /**
- * Calls a paid route without paying and checks the 402 it returns against
- * what the facilitator and a stock client need: x402 V2, an exact-scheme
- * Algorand accept with the full-hash CAIP-2 id, USDC, a price a stock client
- * will pay, one payTo, the challenge tag, a fee payer and a Bazaar declaration.
+ * Calls a paid route with an empty body and no payment, the way the
+ * facilitator's x402 Doctor and listing refresh do, and checks the answer:
+ * a 402 before any request validation, x402 V2, an exact-scheme Algorand
+ * accept with the full-hash CAIP-2 id, USDC, a price a stock client will pay,
+ * one payTo, the challenge tag, a fee payer and a Bazaar declaration whose
+ * example body passes the route's own schema. Checking the body belongs to
+ * the paid retry, before settlement.
  */
 export async function checkChallenge(
   probe: RouteProbe,
   expected: { network: "mainnet" | "testnet"; payTo?: string },
   fetchFn: FetchLike = fetch,
 ): Promise<ChallengeCheck> {
-  const res = await fetchFn(probe.url, {
-    method: probe.method,
-    headers: { "content-type": "application/json" },
-    ...(probe.body !== undefined ? { body: JSON.stringify(probe.body) } : {}),
-  });
+  const res = await fetchFn(probe.url, { method: probe.method, headers: { "content-type": "application/json" }, body: "{}" });
   const base = { url: probe.url, status: res.status };
-  if (probe.expectRefusalBeforeCharge) {
-    if (res.status === 402) return { ...base, ok: false, problems: ["CHARGES_BEFORE_TRIP_CHECK"] };
-    const body = (await res.json().catch(() => null)) as { charged?: unknown } | null;
-    return res.status >= 400 && res.status < 500 && body?.charged === false
-      ? { ...base, ok: true, problems: [], refusedBeforeCharge: true }
-      : { ...base, ok: false, problems: ["NO_UNCHARGED_REFUSAL"] };
+  if (res.status !== 402) {
+    return { ...base, ok: false, problems: [res.status >= 400 && res.status < 500 ? "REFUSES_BEFORE_402" : "NOT_402"] };
   }
-  if (res.status !== 402) return { ...base, ok: false, problems: ["NOT_402"] };
   const header = res.headers.get("payment-required");
   if (!header) return { ...base, ok: false, problems: ["NO_PAYMENT_REQUIRED_HEADER"] };
   const required = decodeHeader(header);
@@ -115,7 +120,9 @@ export async function checkChallenge(
   if (expected.payTo !== undefined && accept.payTo !== expected.payTo) problems.push("PAY_TO_DIFFERS");
   if (accept.extra?.tag !== CHALLENGE_TAG) problems.push("MISSING_CHALLENGE_TAG");
   if (!accept.extra?.feePayer) problems.push("MISSING_FEE_PAYER");
-  if (!required.extensions?.bazaar) problems.push("MISSING_BAZAAR_DECLARATION");
+  const bazaar = required.extensions?.bazaar;
+  if (!bazaar) problems.push("MISSING_BAZAAR_DECLARATION");
+  else if (probe.schema && !parseWith(probe.schema, bazaar.info?.input?.body).ok) problems.push("BAZAAR_EXAMPLE_INVALID");
 
   return {
     ...base,
@@ -134,30 +141,30 @@ export interface DiscoveryResource {
 }
 
 /**
- * Reads `/.well-known/x402` and checks every paid route it lists, requiring
- * one payTo across all of them. `bodies` maps a route's last path segment to
- * a request body. A route without a body is probed with `{}` and must refuse
- * it before charging.
+ * Reads `/.well-known/x402` and checks every paid route it lists on one
+ * network. Only Mainnet routes belong in the Bazaar, so when the document
+ * lists no TestNet routes, the sandbox mirror of each Mainnet route is probed
+ * instead. On Mainnet all routes must share one payTo.
  */
 export async function checkHostChallenges(
   host: string,
   network: "mainnet" | "testnet",
-  bodies: Record<string, unknown>,
   fetchFn: FetchLike = fetch,
 ): Promise<{ payTo: string | null; checks: ChallengeCheck[] }> {
   const res = await fetchFn(`${host}/.well-known/x402`, { headers: { accept: "application/json" } });
   const doc = (res.ok ? await res.json() : { resources: [] }) as { resources?: DiscoveryResource[] };
-  const caip2 = NETWORKS[network].caip2;
-  const resources = (doc.resources ?? []).filter((r) => networkByCaip2(r.network)?.caip2 === caip2);
-  const payTos = new Set(resources.map((r) => r.payTo));
+  const listed = doc.resources ?? [];
+  const onNetwork = (n: "mainnet" | "testnet") => listed.filter((r) => networkByCaip2(r.network)?.caip2 === NETWORKS[n].caip2);
+  const mirrored = onNetwork("mainnet").map((r) => ({ ...r, url: r.url.replace("/v1/", "/sandbox/v1/"), payTo: "" }));
+  const resources = network === "testnet" && onNetwork("testnet").length === 0 ? mirrored : onNetwork(network);
+  const payTos = new Set(resources.map((r) => r.payTo).filter((p) => p !== ""));
   const payTo = payTos.size === 1 ? [...payTos][0]! : null;
   const checks = await Promise.all(
     resources.map((r) => {
       const path = new URL(r.url).pathname;
-      const route = path.slice(path.lastIndexOf("/") + 1);
-      const body = bodies[route];
+      const schema = ROUTE_SCHEMAS[path.slice(path.lastIndexOf("/") + 1)];
       return checkChallenge(
-        { method: r.method === "GET" ? "GET" : "POST", url: r.url, body: body ?? {}, expectRefusalBeforeCharge: body === undefined },
+        { method: r.method === "GET" ? "GET" : "POST", url: r.url, ...(schema ? { schema } : {}) },
         { network, ...(payTo ? { payTo } : {}) },
         fetchFn,
       );

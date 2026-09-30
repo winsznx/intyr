@@ -71,13 +71,14 @@ supplier or caller data is true.
 To check the paid surface itself:
 
 ```sh
-pnpm --filter @intyr/verifier check-402            # add --mainnet for /v1
+pnpm --filter @intyr/verifier check-402            # Mainnet /v1; add --testnet for the sandbox
 ```
 
-It calls every route listed in `/.well-known/x402` without paying. `check` and `prepare` must answer with a
-`402` that carries x402 V2, the full-hash Algorand network id, USDC, a price a stock client will pay, one
-payTo, the challenge tag, a fee payer and a Bazaar declaration. The routes bound to a trip must refuse an
-unknown trip with `charged: false` before they ask for payment.
+It calls every paid route with an empty body and no payment, the way the facilitator's x402 Doctor and
+listing refresh do. Each route must answer a `402` before it validates the body. The `402` must carry x402
+V2, the full-hash Algorand network id, USDC, a price a stock client will pay, one payTo, the challenge tag, a
+fee payer and a Bazaar example that passes the route's own schema. The body check belongs to the paid retry,
+before settlement, so a request that would be refused is never charged.
 
 ## Status on 2026-09-30
 

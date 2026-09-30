@@ -1,48 +1,39 @@
-import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { checkHostChallenges } from "./challenge";
 
-const USAGE = `Usage: check-402 [--host <url>] [--mainnet]
+const USAGE = `Usage: check-402 [--host <url>] [--testnet]
 
-Calls every paid route listed in the host's /.well-known/x402 without paying
-and checks each 402 for x402 V2, the full-hash Algorand network id, USDC, a
-price a stock client will pay, one payTo, the challenge tag, a fee payer and
-a Bazaar declaration. TestNet by default. Exit code 0 means every route passed.`;
-
-const EXAMPLE_REQUESTS = new URL("../../../examples/agent/requests/", import.meta.url);
-
-function exampleBody(file: string): unknown {
-  return JSON.parse(readFileSync(new URL(file, EXAMPLE_REQUESTS), "utf8"));
-}
+Calls every paid route listed in the host's /.well-known/x402 with an empty
+body and no payment, the way the facilitator's x402 Doctor and listing
+refresh do. Each must answer a 402 before validating the body, with x402 V2,
+the full-hash Algorand network id, USDC, a price a stock client will pay, one
+payTo, the challenge tag, a fee payer and a Bazaar example that passes the
+route's schema. Mainnet by default. --testnet probes the /sandbox/v1 mirror.
+Exit code 0 means every route passed.`;
 
 export async function main(argv: string[]): Promise<number> {
   let host = "https://intyr.timjosh507.workers.dev";
-  let network: "mainnet" | "testnet" = "testnet";
+  let network: "mainnet" | "testnet" = "mainnet";
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--host" && argv[i + 1]) host = argv[++i]!.replace(/\/+$/, "");
+    else if (argv[i] === "--testnet") network = "testnet";
     else if (argv[i] === "--mainnet") network = "mainnet";
     else {
       console.error(USAGE);
       return 2;
     }
   }
-  const bodies = { check: exampleBody("check.json"), prepare: exampleBody("prepare.json") };
-  const { payTo, checks } = await checkHostChallenges(host, network, bodies);
+  const { payTo, checks } = await checkHostChallenges(host, network);
   if (checks.length === 0) {
     console.log(`${host}/.well-known/x402 lists no ${network} paid routes.`);
     return 1;
   }
-  console.log(`${network} paid routes on ${host}, payTo ${payTo ?? "NOT UNIQUE"}`);
+  console.log(`${network} paid routes on ${host}, payTo ${payTo ?? (network === "mainnet" ? "NOT UNIQUE" : "not listed")}`);
   for (const c of checks) {
-    const verdict = c.ok ? "PASS" : "FAIL";
-    const detail = c.refusedBeforeCharge
-      ? `refused before charge (${c.status}), no trip given`
-      : c.ok
-        ? `402, ${Number(c.amount) / 1_000_000} USDC`
-        : c.problems.join(", ");
-    console.log(`  ${verdict}  ${new URL(c.url).pathname}  ${detail}`);
+    const detail = c.ok ? `402, ${Number(c.amount) / 1_000_000} USDC` : `${c.status}: ${c.problems.join(", ")}`;
+    console.log(`  ${c.ok ? "PASS" : "FAIL"}  ${new URL(c.url).pathname}  ${detail}`);
   }
-  const passed = payTo !== null && checks.every((c) => c.ok);
+  const passed = (network === "testnet" || payTo !== null) && checks.every((c) => c.ok);
   console.log(passed ? "All paid routes pass." : "Some paid routes fail.");
   return passed ? 0 : 1;
 }

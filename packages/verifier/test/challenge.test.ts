@@ -1,12 +1,26 @@
 import type { FetchLike } from "@intyr/chain";
 import { describe, expect, it } from "vitest";
-import { checkChallenge, checkHostChallenges } from "../src/challenge";
+import { checkChallenge, checkHostChallenges, ROUTE_SCHEMAS } from "../src/challenge";
 
 const TESTNET = "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=";
 const PAY_TO = "ZBSIVWPNE3WGZBUTLNTGXJBBAAEWYVPHYQL2C2CGYFCLXEL2CWMNYTKTXA";
 const HOST = "https://intyr.test";
+const VALID_CHECK_BODY = {
+  currency: "USD",
+  legs: [
+    {
+      leg_id: "hotel-1",
+      type: "HOTEL",
+      supplier: "example-hotels",
+      offer_ref: "offer-1",
+      price: { amount_minor: 40_000, currency: "USD" },
+      preparation_mode: "SOFT_HOLD",
+      refundable: true,
+    },
+  ],
+};
 
-function header(accept: Record<string, unknown>, extra: Record<string, unknown> = {}): string {
+function header(accept: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): string {
   const body = {
     x402Version: 2,
     accepts: [
@@ -20,7 +34,7 @@ function header(accept: Record<string, unknown>, extra: Record<string, unknown> 
         ...accept,
       },
     ],
-    extensions: { bazaar: { info: {} } },
+    extensions: { bazaar: { info: { input: { type: "http", bodyType: "json", body: VALID_CHECK_BODY } } } },
     ...extra,
   };
   return btoa(JSON.stringify(body));
@@ -30,12 +44,23 @@ function respond402(value: string): FetchLike {
   return async () => new Response("{}", { status: 402, headers: { "payment-required": value } });
 }
 
-const probe = { method: "POST" as const, url: `${HOST}/sandbox/v1/trips/check`, body: {} };
+const probe = { method: "POST" as const, url: `${HOST}/sandbox/v1/trips/check`, schema: ROUTE_SCHEMAS["check"]! };
 
 describe("checkChallenge", () => {
-  it("passes a 402 that a stock client can pay and the facilitator can tag", async () => {
-    const check = await checkChallenge(probe, { network: "testnet", payTo: PAY_TO }, respond402(header({})));
+  it("passes a 402 that a stock client can pay and the facilitator can tag and list", async () => {
+    const check = await checkChallenge(probe, { network: "testnet", payTo: PAY_TO }, respond402(header()));
     expect([check.ok, check.problems, check.amount]).toEqual([true, [], "100000"]);
+  });
+
+  it("fails a route that validates the body before answering 402", async () => {
+    // #given a route that refuses the empty body the x402 Doctor sends
+    const refusing: FetchLike = async () => new Response(JSON.stringify({ charged: false }), { status: 422 });
+
+    // #when it is probed
+    const check = await checkChallenge(probe, { network: "testnet" }, refusing);
+
+    // #then the listing refresh would fail on it
+    expect(check.problems).toEqual(["REFUSES_BEFORE_402"]);
   });
 
   it("catches the truncated CAIP-2 id that the @x402/avm constants produce", async () => {
@@ -53,12 +78,17 @@ describe("checkChallenge", () => {
   });
 
   it("flags a missing challenge tag, fee payer and Bazaar declaration", async () => {
-    const check = await checkChallenge(
-      probe,
-      { network: "testnet" },
-      respond402(header({ extra: {} }, { extensions: {} })),
-    );
+    const check = await checkChallenge(probe, { network: "testnet" }, respond402(header({ extra: {} }, { extensions: {} })));
     expect(check.problems).toEqual(["MISSING_CHALLENGE_TAG", "MISSING_FEE_PAYER", "MISSING_BAZAAR_DECLARATION"]);
+  });
+
+  it("flags a Bazaar example body that the route's own schema rejects", async () => {
+    // #given an example whose price is fractional minor units
+    const bad = { ...VALID_CHECK_BODY, legs: [{ ...VALID_CHECK_BODY.legs[0], price: { amount_minor: 10.5, currency: "USD" } }] };
+    const value = header({}, { extensions: { bazaar: { info: { input: { body: bad } } } } });
+
+    // #then a client copying the example would be refused
+    expect((await checkChallenge(probe, { network: "testnet" }, respond402(value))).problems).toEqual(["BAZAAR_EXAMPLE_INVALID"]);
   });
 
   it("flags a Mainnet route that points at the TestNet asset", async () => {
@@ -69,31 +99,10 @@ describe("checkChallenge", () => {
     );
     expect(check.problems).toEqual(["WRONG_ASSET"]);
   });
-
-  it("passes a trip-bound route that refuses an unknown trip before charging", async () => {
-    const refusing: FetchLike = async () =>
-      new Response(JSON.stringify({ outcome: "REFUSE", charged: false }), { status: 404 });
-    const check = await checkChallenge({ ...probe, expectRefusalBeforeCharge: true }, { network: "testnet" }, refusing);
-    expect([check.ok, check.refusedBeforeCharge]).toEqual([true, true]);
-  });
-
-  it("fails a trip-bound route that asks to be paid for a trip it has not found", async () => {
-    // #given a route that answers 402 even though the probe names no real trip
-    const check = await checkChallenge({ ...probe, expectRefusalBeforeCharge: true }, { network: "testnet" }, respond402(header({})));
-
-    // #then it would charge for a request that cannot succeed
-    expect(check.problems).toEqual(["CHARGES_BEFORE_TRIP_CHECK"]);
-  });
-
-  it("fails a route that answers something other than a 402 to a valid body", async () => {
-    const refusing: FetchLike = async () => new Response(JSON.stringify({ charged: false }), { status: 404 });
-    expect((await checkChallenge(probe, { network: "testnet" }, refusing)).problems).toEqual(["NOT_402"]);
-  });
 });
 
 describe("checkHostChallenges", () => {
   it("requires one payTo across every route in the discovery document", async () => {
-    // #given a host whose discovery document lists two payTo addresses
     const discovery = {
       resources: [
         { url: `${HOST}/sandbox/v1/trips/check`, method: "POST", network: TESTNET, payTo: PAY_TO },
@@ -103,12 +112,7 @@ describe("checkHostChallenges", () => {
     const fetchFn: FetchLike = async (url) =>
       url.endsWith("/.well-known/x402")
         ? new Response(JSON.stringify(discovery), { status: 200 })
-        : new Response("{}", { status: 402, headers: { "payment-required": header({}) } });
-
-    // #when the host is checked
-    const result = await checkHostChallenges(HOST, "testnet", { check: {}, prepare: {} }, fetchFn);
-
-    // #then there is no single payTo to hold the routes to
-    expect(result.payTo).toBeNull();
+        : new Response("{}", { status: 402, headers: { "payment-required": header() } });
+    expect((await checkHostChallenges(HOST, "testnet", fetchFn)).payTo).toBeNull();
   });
 });

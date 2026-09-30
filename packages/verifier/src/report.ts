@@ -103,8 +103,12 @@ function paymentLine(payment: PaymentResult): string {
 
 function integrityLine(report: ProofReport): string {
   if (report.integrity.ok) {
-    const roots = report.schema_version === "transaction-manifest/1" ? "component and decision roots match" : "component root matches";
-    return `signature valid with key ${report.key_id}, payload hash matches, ${roots}`;
+    const roots: Record<ProofReport["schema_version"], string> = {
+      "commit-plan/1": "",
+      "commit-manifest/1": ", component root matches",
+      "transaction-manifest/1": ", component and decision roots match",
+    };
+    return `signature valid with key ${report.key_id}, payload hash matches${roots[report.schema_version]}`;
   }
   return `failed: ${report.integrity.reason}`;
 }

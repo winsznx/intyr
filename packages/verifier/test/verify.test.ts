@@ -1,6 +1,8 @@
 import {
   buildCommitManifest,
   buildTransactionManifest,
+  checkTrip,
+  CheckRequestSchema,
   generateSigningKey,
   publishedKey,
   signCommitManifest,
@@ -259,6 +261,39 @@ describe("verifyProof", () => {
       "PROOF_PARTIAL",
       "HASH_MISMATCH",
       { ok: false, reason: "DECISIONS_ROOT_MISMATCH" },
+    ]);
+  });
+});
+
+describe("verifyProof on a signed commit plan", () => {
+  it("verifies the plan's signature and marks its caller-described legs as caller asserted", async () => {
+    // #given a plan signed the way POST /trips/check returns it
+    const key = await generateSigningKey("intyr-test");
+    const request = CheckRequestSchema.parse({
+      currency: "USD",
+      legs: [
+        {
+          leg_id: "hotel",
+          type: "HOTEL",
+          supplier: "x",
+          offer_ref: "o",
+          price: { amount_minor: 100, currency: "USD" },
+          preparation_mode: "HARD_HOLD",
+          refundable: true,
+        },
+      ],
+    });
+    const signed = await checkTrip(request, { now: NOW, environment: "TESTNET", key });
+
+    // #when it is verified without an anchor
+    const report = await verifyProof({ signed, keys: [publishedKey(key, NOW.toISOString())], anchor: null }, { endpoints: ENDPOINTS });
+
+    // #then the signature holds and the report names the plan, not a manifest
+    expect([report.integrity, report.proof_state, report.manifest_id, report.evidence_banner]).toEqual([
+      { ok: true },
+      "PROOF_PARTIAL",
+      signed.payload.plan_id,
+      "CALLER_ASSERTED",
     ]);
   });
 });

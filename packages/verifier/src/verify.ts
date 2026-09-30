@@ -1,7 +1,6 @@
 import {
   integrityProofState,
   verifyManifestDocument,
-  type CommitManifest,
   type EvidenceBanner,
   type ManifestCheck,
   type ManifestStatus,
@@ -9,7 +8,7 @@ import {
   type ProofState,
   type PublishedKey,
   type Signed,
-  type TransactionManifest,
+  type SignedRecord,
 } from "@intyr/core";
 import {
   checkManifestAnchor,
@@ -23,7 +22,8 @@ import {
   type TransferCheck,
 } from "@intyr/chain";
 
-export type VerifiableManifest = CommitManifest | TransactionManifest;
+/** A commit plan from check, a commit manifest from prepare or revalidate, or a final transaction manifest. */
+export type VerifiableManifest = SignedRecord;
 
 export interface ProofInput {
   signed: Signed<VerifiableManifest>;
@@ -57,6 +57,7 @@ export type PaymentResult =
 
 export interface ProofReport {
   proof_state: ProofState;
+  /** The manifest id, or the plan id for a commit plan. */
   manifest_id: string;
   schema_version: VerifiableManifest["schema_version"];
   environment: VerifiableManifest["environment"];
@@ -111,9 +112,19 @@ async function checkPayment(payment: PaymentRef, options: ProofOptions): Promise
   }
 }
 
-function paymentsOf(manifest: VerifiableManifest): PaymentRef[] {
-  const outbound = manifest.schema_version === "transaction-manifest/1" ? manifest.outbound_payments : [];
-  return [...manifest.inbound_payments, ...outbound].filter((p) => p.txid.length > 0);
+function paymentsOf(record: VerifiableManifest): PaymentRef[] {
+  if (record.schema_version === "commit-plan/1") return [];
+  const outbound = record.schema_version === "transaction-manifest/1" ? record.outbound_payments : [];
+  return [...record.inbound_payments, ...outbound].filter((p) => p.txid.length > 0);
+}
+
+/** A plan's legs are described by the caller and never read from a supplier. */
+function bannerOf(record: VerifiableManifest): EvidenceBanner {
+  return record.schema_version === "commit-plan/1" ? "CALLER_ASSERTED" : record.evidence_banner;
+}
+
+function idOf(record: VerifiableManifest): string {
+  return record.schema_version === "commit-plan/1" ? record.plan_id : record.manifest_id;
 }
 
 function anchorProofState(anchor: AnchorResult): ProofState {
@@ -141,14 +152,14 @@ function anchorProofState(anchor: AnchorResult): ProofState {
  */
 export async function verifyProof(input: ProofInput, options: ProofOptions = {}): Promise<ProofReport> {
   const { signed } = input;
-  const manifest = signed.payload;
+  const record = signed.payload;
   const base = {
-    manifest_id: manifest.manifest_id,
-    schema_version: manifest.schema_version,
-    environment: manifest.environment,
+    manifest_id: idOf(record),
+    schema_version: record.schema_version,
+    environment: record.environment,
     payload_hash: signed.payload_hash,
     key_id: signed.signature.key_id,
-    evidence_banner: manifest.evidence_banner,
+    evidence_banner: bannerOf(record),
     verified_at: (options.now?.() ?? new Date()).toISOString(),
     scope: SCOPE,
   };
@@ -168,7 +179,7 @@ export async function verifyProof(input: ProofInput, options: ProofOptions = {})
         })
       : { state: "UNKNOWN_NETWORK", network: input.anchor.network };
   }
-  const payments = await Promise.all(paymentsOf(manifest).map((p) => checkPayment(p, options)));
+  const payments = await Promise.all(paymentsOf(record).map((p) => checkPayment(p, options)));
 
   let proof_state = anchorProofState(anchor);
   if (proof_state === "PROOF_VERIFIED" && payments.some((p) => p.state !== "MATCHED")) proof_state = "PROOF_PARTIAL";
