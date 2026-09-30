@@ -115,14 +115,13 @@ manifest `man_6e12c241db89cf1968e97636`.
 - Each leg was confirmed by reading the booking back from the supplier (evidence tier E1).
 - The trip ended `COMMITTED` with nothing stranded.
 - The prepare gate scored readiness at 61, below the 70 bar. That score is an unvalidated prior. Under
-  `sandbox-supplier-v1` a person approved the commit before it ran.
+  `sandbox-supplier-v1` the trip went prepare, then a person's approval, then commit.
 - It ran on the sponsored TestNet sandbox, so no USDC moved for Intyr's fee.
 - The commit call took 49 seconds end to end, because both suppliers are slow. An agent needs a long client
   timeout on commit.
 The record verifies with `pnpm --filter @intyr/verifier verify man_6e12c241db89cf1968e97636 --sandbox`
-(`PROOF_PARTIAL`, signed and intact, not yet anchored). One gap: the commit decision that asked for approval was
-returned to the caller but is missing from this record's decision list. That is a logging bug on the sponsored
-path, and a fix is in progress.
+(`PROOF_PARTIAL`, signed and intact, not yet anchored). Its four decisions are the whole trail: prepare, commit,
+and one confirmation per leg.
 
 The first real-supplier sandbox run went wrong, and it's kept as evidence. It's trip `trp_d261cfdcabc61cbc93f83adb`,
 with transaction manifest `man_4fce63d207b53b0a5def9130`.
