@@ -8,6 +8,8 @@ import type { ServiceDeps } from "./service/context";
 import { parseCheck, parseIntent, invalid, runCheck, runPrepare, runRevalidate, tripOwner } from "./service/prepare";
 import { precheckCommit, reconcileUnknownTrips, runCommit } from "./service/commit";
 import type { PaymentSession } from "../payments/sessions";
+import { anchorHash, reconcileAnchors } from "../anchor";
+import { networkConfig } from "../config";
 import { precheckRecover, runRecover } from "./service/recover-route";
 
 export const KEY_ID = "intyr-2026-09-a";
@@ -32,13 +34,17 @@ export interface Domain {
 export function buildServiceDeps(env: Env, environment: Environment): ServiceDeps | null {
   if (!env.MANIFEST_SIGNING_JWK) return null;
   const key: SigningKey = signingKeyFromJwkJson(KEY_ID, env.MANIFEST_SIGNING_JWK);
+  const store = new TripStore(env.DB);
+  const mnemonic = environment === "MAINNET" ? env.ANCHOR_MNEMONIC_MAINNET : env.ANCHOR_MNEMONIC_TESTNET;
+  const net = networkConfig(environment === "MAINNET" ? "mainnet" : "testnet", env);
   return {
-    store: new TripStore(env.DB),
+    store,
     adapters: createAdapterRegistry(env),
     key,
     environment,
     allowScenario: environment === "TESTNET",
     now: () => new Date(),
+    ...(mnemonic ? { anchor: (manifestId: string, hash: string) => anchorHash({ net, mnemonic }, manifestId, hash, store) } : {}),
   };
 }
 
@@ -93,7 +99,11 @@ export function createDomain(env: Env, environment: Environment): Domain {
       handler: (ctx) => runRecover(ctx.body, ctx, deps),
     },
   };
-  return { handlers, reconcile: () => reconcileUnknownTrips(deps, sessionForTrip) };
+  const net = networkConfig(environment === "MAINNET" ? "mainnet" : "testnet", env);
+  return {
+    handlers,
+    reconcile: async () => (await reconcileUnknownTrips(deps, sessionForTrip)) + (await reconcileAnchors(store, net, deps.now())),
+  };
 }
 
 export { tripOwner };

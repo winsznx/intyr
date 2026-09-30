@@ -232,7 +232,7 @@ export async function finalizeManifest(
   });
   if (deps.anchor) {
     try {
-      const ref = await deps.anchor(signed.payload_hash);
+      const ref = await deps.anchor(manifest.manifest_id, signed.payload_hash);
       if (ref) {
         await updateTripDoc(deps.store, tripId, deps.now().toISOString(), (d) => {
           d.anchor = { state: ref.confirmed_round ? "CONFIRMED" : "PENDING", txid: ref.txid, mode: ref.mode };

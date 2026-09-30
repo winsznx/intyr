@@ -307,7 +307,7 @@ export function ErrorState({ error, onRetry, what }: { error: Error; onRetry?: (
         </span>
         <h2 className="card-title">Not found</h2>
         <p className="muted" style={{ maxWidth: 520 }}>
-          There is no {what} with this id in the current session. Sandbox sessions keep data for 24 hours.
+          Nothing with this id exists in the current sandbox session. Sessions keep their trips for 24 hours, and each browser has its own session.
         </p>
       </div>
     );

@@ -14,8 +14,9 @@ export interface Env {
   INDEXER_URL?: string;
   /** JWK of the Ed25519 manifest signing key (secret). */
   MANIFEST_SIGNING_JWK?: string;
-  /** Mnemonic of the anchor signer (secret). */
-  ANCHOR_MNEMONIC?: string;
+  /** Mnemonics of the small hot anchor accounts, one per network (secrets). */
+  ANCHOR_MNEMONIC_MAINNET?: string;
+  ANCHOR_MNEMONIC_TESTNET?: string;
   DUFFEL_TOKEN?: string;
   LITEAPI_KEY?: string;
 }

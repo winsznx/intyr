@@ -147,7 +147,7 @@ export async function runCheck(request: CheckRequest, ctx: PaidContext, deps: Se
 async function anchorBestEffort(deps: ServiceDeps, manifestId: string, hash: string): Promise<{ state: string; txid: string | null; mode: string }> {
   if (!deps.anchor) return { state: "NOT_CONFIGURED", txid: null, mode: "UNANCHORED" };
   try {
-    const ref = await deps.anchor(hash);
+    const ref = await deps.anchor(manifestId, hash);
     if (!ref) return { state: "NOT_CONFIGURED", txid: null, mode: "UNANCHORED" };
     return { state: ref.confirmed_round ? "CONFIRMED" : "PENDING", txid: ref.txid, mode: ref.mode };
   } catch {

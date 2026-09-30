@@ -1,5 +1,6 @@
 import type {
   DemoRun,
+  DemoScenario,
   EvidenceRun,
   GateDecision,
   ManifestDocument,
@@ -10,13 +11,13 @@ import type {
   PublicStats,
   SandboxSession,
   Trip,
-  TripRequest,
+  TripIntent,
+  CheckRequest,
   TripSummary,
   VerifyResult,
   VersionInfo,
-  CallerLeg,
-  Money,
 } from "./types";
+import { normalizeList, normalizeTrip } from "./trip-wire";
 
 /**
  * The UI works against the sandbox mirror (TestNet, server-held payer, cookie session).
@@ -130,21 +131,32 @@ export interface ActionResponse {
   manifest_id?: string;
   manifest_hash?: string;
   supplier_action_may_have_occurred?: boolean;
+  state?: string;
+  plan_id?: string;
+  verdict?: string;
+  outcome?: string;
+  reason_codes?: string[];
+  failures?: Array<{ component_id: string; reason: string; detail?: string }>;
+  no_booking_occurred?: boolean;
 }
 
 export const api = {
-  listTrips: (signal?: AbortSignal) => sandbox<{ trips: TripSummary[] } | TripSummary[]>("GET", "/trips", undefined, signal).then(unwrapList),
-  getTrip: (tripId: string, signal?: AbortSignal) => sandbox<Trip | { trip: Trip }>("GET", `/trips/${encodeURIComponent(tripId)}`, undefined, signal).then(unwrapTrip),
+  listTrips: (signal?: AbortSignal): Promise<TripSummary[]> => sandbox<unknown>("GET", "/trips", undefined, signal).then(normalizeList),
+  getTrip: (tripId: string, signal?: AbortSignal): Promise<Trip> => sandbox<unknown>("GET", `/trips/${encodeURIComponent(tripId)}`, undefined, signal).then(normalizeTrip),
   getOperation: (operationId: string, signal?: AbortSignal) => sandbox<Operation>("GET", `/operations/${encodeURIComponent(operationId)}`, undefined, signal),
 
-  checkTrip: (body: { legs: CallerLeg[]; budget_total: Money; label?: string }) => sandbox<ActionResponse>("POST", "/trips/check", body),
-  prepareTrip: (body: TripRequest) => sandbox<ActionResponse>("POST", "/trips/prepare", body),
+  checkTrip: (body: CheckRequest) => sandbox<ActionResponse>("POST", "/trips/check", body),
+  prepareTrip: (body: TripIntent) => sandbox<ActionResponse>("POST", "/trips/prepare", body),
   revalidateTrip: (tripId: string) => sandbox<ActionResponse>("POST", "/trips/revalidate", { trip_id: tripId }),
-  commitTrip: (tripId: string, manifestHash: string) => sandbox<ActionResponse>("POST", "/trips/commit", { trip_id: tripId, manifest_hash: manifestHash }),
-  recoverTrip: (tripId: string) => sandbox<ActionResponse>("POST", "/trips/recover", { trip_id: tripId }),
+  commitTrip: (body: { trip_id: string; manifest_id: string; manifest_hash: string; maximum_total_minor: number; currency: string }) =>
+    sandbox<ActionResponse>("POST", "/trips/commit", { ...body, recovery_policy_acknowledged: true }),
+  recoverTrip: (tripId: string, options: { allow_replacement?: boolean; replacement_headroom_minor?: number } = {}) =>
+    sandbox<ActionResponse>("POST", "/trips/recover", { trip_id: tripId, allow_replacement: options.allow_replacement ?? true, replacement_headroom_minor: options.replacement_headroom_minor ?? 0 }),
   approveTrip: (tripId: string, body: { manifest_hash: string; decision: "APPROVE" | "REJECT"; note?: string }) =>
     sandbox<ActionResponse>("POST", `/trips/${encodeURIComponent(tripId)}/approve`, body),
-  runDemo: (scenario?: string) => sandbox<DemoRun>("POST", "/demo/run", scenario ? { scenario } : {}),
+  getDemoScenarios: (signal?: AbortSignal): Promise<DemoScenario[]> =>
+    sandbox<DemoScenario[] | { scenarios?: DemoScenario[]; items?: DemoScenario[] }>("GET", "/demo/scenarios", undefined, signal).then((r) => (Array.isArray(r) ? r : (r.scenarios ?? r.items ?? []))),
+  runDemo: (scenario: string, seed?: number) => sandbox<DemoRun>("POST", "/demo/run", seed === undefined ? { scenario } : { scenario, seed }),
 
   getManifest: (manifestId: string, signal?: AbortSignal) => request<ManifestDocument>("GET", `${PUBLIC}/manifests/${encodeURIComponent(manifestId)}`, undefined, signal),
   verifyManifest: (body: { manifest_id?: string; manifest?: unknown; txid?: string }) => request<VerifyResult>("POST", `${PUBLIC}/manifests/verify`, body),
@@ -154,11 +166,3 @@ export const api = {
   getVersion: (signal?: AbortSignal) => request<VersionInfo>("GET", "/version", undefined, signal),
   getSigningKeys: (signal?: AbortSignal) => request<{ keys: Array<{ key_id: string; public_key: string; revoked?: boolean }> }>("GET", "/.well-known/intyr-signing-keys.json", undefined, signal),
 };
-
-function unwrapList(r: { trips: TripSummary[] } | TripSummary[]): TripSummary[] {
-  return Array.isArray(r) ? r : r.trips;
-}
-
-function unwrapTrip(r: Trip | { trip: Trip }): Trip {
-  return "trip" in r && r.trip ? r.trip : (r as Trip);
-}

@@ -11,7 +11,7 @@ export interface ServiceDeps {
   allowScenario: boolean;
   now: () => Date;
   /** Records a manifest hash on chain. Returns null when anchoring is not configured. */
-  anchor?: (manifestHash: string) => Promise<AnchorRef | null>;
+  anchor?: (manifestId: string, manifestHash: string) => Promise<(AnchorRef & { state?: string }) | null>;
 }
 
 /** Hash-chained decision log for one trip. Every gate decision is stored before its effect is applied. */

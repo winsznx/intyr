@@ -55,6 +55,7 @@ export type OutcomeVerification = "PENDING_WINDOW" | "VERIFIED" | "CONTRADICTED"
 
 export type PaymentState =
   | "NONE"
+  | "SPONSORED"
   | "CHALLENGED"
   | "PROOF_RECEIVED"
   | "VERIFIED"
@@ -199,6 +200,18 @@ export interface Trip {
   anchors?: AnchorRef[];
   run_label?: string;
   scenario_seed?: string | number;
+  anchor_state?: string;
+  /** Sum of every leg in the manifest. */
+  quoted_total?: Money;
+  /** Sum of legs currently confirmed at the supplier. */
+  booked_total?: Money;
+  /** Money paid for legs that are neither part of a completed outcome nor refunded. */
+  stranded_spend?: Money;
+  initial_manifest_id?: string;
+  final_manifest_id?: string;
+  plan_id?: string;
+  deadline?: string;
+  version?: number;
 }
 
 export interface TripSummary {
@@ -327,7 +340,15 @@ export interface SandboxSession {
 export interface DemoRun {
   run_id: string;
   trip_id: string;
-  operation_id: string;
+  scenario?: string;
+  label?: string;
+  final_state?: string;
+  outcome?: string;
+}
+
+export interface DemoScenario {
+  id: string;
+  label: string;
 }
 
 export interface VersionInfo {
@@ -338,35 +359,75 @@ export interface VersionInfo {
   networks?: Record<string, unknown>;
 }
 
-/** Legs an agent brings itself (POST .../trips/check). */
-export interface CallerLeg {
-  type: ComponentType;
-  supplier: string;
-  offer_id?: string;
-  price: Money;
-  expires_at?: string;
-  hold_type?: PreparationMode;
-  refundable?: boolean;
-  free_cancel_until?: string;
-  requires_instant_payment?: boolean;
+/** Supplier clocks as the API accepts them. Unknown clocks are null. */
+export interface ClockInput {
+  price_valid_until?: string | null;
+  inventory_held_until?: string | null;
+  free_cancel_until?: string | null;
+  void_until?: string | null;
+  refund_destination?: RefundDestination;
+  refund_amount_certainty?: "QUOTED" | "ESTIMATED" | "UNKNOWN";
+  confirmation_mode?: "INSTANT" | "ASYNC" | "MANUAL";
+  supplier_can_cancel?: boolean;
 }
 
-export interface TripRequest {
-  label?: string;
-  components: Array<{
-    type: ComponentType;
-    origin?: string;
-    destination?: string;
-    location?: string;
-    depart_on?: string;
-    check_in?: string;
-    check_out?: string;
-    pickup_at?: string;
-    travelers?: number;
-    source?: "SUPPLIER_SANDBOX" | "SIMULATED";
-    scenario?: string;
-  }>;
-  budget_total: Money;
-  max_price_move_pct?: number;
+export interface Limits {
+  max_total_minor?: number;
+  max_irreversible_minor?: number;
   min_readiness?: number;
+  max_price_move_pct?: number;
+}
+
+/** A leg an agent found itself and describes (POST .../trips/check). */
+export interface CallerLeg {
+  leg_id: string;
+  type: "FLIGHT" | "HOTEL" | "GROUND" | "ESIM" | "DATA" | "OTHER";
+  supplier: string;
+  offer_ref: string;
+  price: Money;
+  preparation_mode: Exclude<PreparationMode, "BONDED_QUOTE">;
+  refundable: boolean;
+  cancellation_fee_minor?: number;
+  clocks?: ClockInput;
+  depends_on?: string[];
+  required?: boolean;
+}
+
+export interface CheckRequest {
+  trip_ref?: string;
+  currency: string;
+  legs: CallerLeg[];
+  limits?: Limits;
+}
+
+export const SIM_SCENARIOS = [
+  "HAPPY",
+  "PRICE_DIVERGENCE",
+  "UNAVAILABLE_AT_COMMIT",
+  "COMMIT_REJECT",
+  "TIMEOUT_BOOKED",
+  "TIMEOUT_NOT_BOOKED",
+  "ACCEPTED_ASYNC_CONFIRMS",
+  "ACCEPTED_ASYNC_FAILS",
+  "RESPONSE_OK_STATUS_DISAGREES",
+  "CANCEL_REFUSED",
+  "NON_REFUNDABLE",
+  "DUPLICATE_ON_RETRY",
+  "HOLD_EXPIRY",
+] as const;
+export type SimScenario = (typeof SIM_SCENARIOS)[number];
+
+export type ComponentRequest =
+  | { type: "FLIGHT"; origin: string; destination: string; depart_date: string; passengers?: number; hold_if_available?: boolean }
+  | { type: "HOTEL"; city?: string; latitude?: number; longitude?: number; check_in: string; check_out: string; guests?: number }
+  | { type: "GROUND"; from: string; to: string; pickup_at: string; passengers?: number };
+
+/** POST .../trips/prepare. No organization, traveler profile or custom header is required. */
+export interface TripIntent {
+  trip_ref?: string;
+  currency: string;
+  budget_total_minor: number;
+  components: ComponentRequest[];
+  limits?: Limits;
+  scenario?: { seed: number; faults: Array<{ component_index: number; fault: SimScenario }> };
 }

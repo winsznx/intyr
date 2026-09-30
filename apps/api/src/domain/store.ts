@@ -192,6 +192,32 @@ export class TripStore {
     return this.db.prepare("SELECT manifest_hash, decision FROM approvals WHERE trip_id = ?1 ORDER BY created_at DESC LIMIT 1").bind(tripId).first();
   }
 
+  async putAnchor(a: { manifest_id: string; network: string; mode: string; txid: string; state: string; now: string }): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO anchors (manifest_id, network, mode, txid, state, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?6)
+         ON CONFLICT(manifest_id) DO UPDATE SET txid = excluded.txid, state = excluded.state, updated_at = excluded.updated_at`,
+      )
+      .bind(a.manifest_id, a.network, a.mode, a.txid, a.state, a.now)
+      .run();
+  }
+
+  async updateAnchor(manifestId: string, patch: { state: string; round?: number; error?: string; now: string }): Promise<void> {
+    await this.db
+      .prepare("UPDATE anchors SET state = ?1, round = COALESCE(?2, round), error = COALESCE(?3, error), updated_at = ?4 WHERE manifest_id = ?5")
+      .bind(patch.state, patch.round ?? null, patch.error ?? null, patch.now, manifestId)
+      .run();
+  }
+
+  getAnchor(manifestId: string): Promise<{ manifest_id: string; network: string; mode: string; txid: string | null; state: string; round: number | null; error: string | null } | null> {
+    return this.db.prepare("SELECT * FROM anchors WHERE manifest_id = ?1").bind(manifestId).first();
+  }
+
+  async listPendingAnchors(limit = 20): Promise<Array<{ manifest_id: string; network: string; txid: string }>> {
+    const r = await this.db.prepare("SELECT manifest_id, network, txid FROM anchors WHERE state IN ('SUBMITTED','PENDING') AND txid IS NOT NULL ORDER BY updated_at LIMIT ?1").bind(limit).all<{ manifest_id: string; network: string; txid: string }>();
+    return r.results ?? [];
+  }
+
   async createSandboxSession(now: string, ttlMs = 24 * 3600_000): Promise<{ id: string; expires_at: string }> {
     const id = newId("evt").replace("evt_", "sbx_");
     const expires = new Date(Date.parse(now) + ttlMs).toISOString();
