@@ -385,14 +385,27 @@ export async function runPrepare(intent: PublicTripIntent, ctx: PaidContext, dep
 
 // --------------------------------------------------------------- revalidate
 
+const REVALIDATABLE = ["PREPARED", "PREPARED_WITH_WARNINGS", "READY_TO_COMMIT"];
+
+/** Runs before any charge. A malformed body, an unknown trip or a trip in the wrong state costs the caller nothing. */
+export async function precheckRevalidate(body: unknown, deps: ServiceDeps): Promise<HandlerResult | null> {
+  const parsed = parseWith(RevalidateRequestSchema, body);
+  if (!parsed.ok) return { status: 422, body: { error: "INVALID_REQUEST", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], issues: parsed.issues, charged: false } };
+  const row = await deps.store.getTrip(parsed.value.trip_id);
+  if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } };
+  if (!REVALIDATABLE.includes(row.state)) {
+    return { status: 409, tripId: row.id, body: { error: "TRIP_STATE_CONFLICT", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], state: row.state, charged: false } };
+  }
+  return null;
+}
+
 export async function runRevalidate(body: unknown, ctx: PaidContext, deps: ServiceDeps): Promise<HandlerResult> {
   const parsed = parseWith(RevalidateRequestSchema, body);
   if (!parsed.ok) return invalid(parsed.issues);
   const row = await deps.store.getTrip(parsed.value.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } };
   const doc = JSON.parse(row.doc_json) as TripDoc;
-  const revalidatable = ["PREPARED", "PREPARED_WITH_WARNINGS", "READY_TO_COMMIT"];
-  if (!revalidatable.includes(row.state)) {
+  if (!REVALIDATABLE.includes(row.state)) {
     return { status: 409, tripId: row.id, body: { error: "TRIP_STATE_CONFLICT", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], state: row.state } };
   }
   const now = deps.now();

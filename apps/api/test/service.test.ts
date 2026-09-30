@@ -5,7 +5,7 @@ import type { PaymentSession } from "../src/payments/sessions";
 import type { PaidContext } from "../src/payments/ladder";
 import { TripStore } from "../src/domain/store";
 import type { ServiceDeps } from "../src/domain/service/context";
-import { runPrepare, parseIntent, runRevalidate } from "../src/domain/service/prepare";
+import { runPrepare, parseIntent, runRevalidate, precheckRevalidate } from "../src/domain/service/prepare";
 import { precheckCommit, runCommit, reconcileUnknownTrips } from "../src/domain/service/commit";
 import { precheckRecover, runRecover } from "../src/domain/service/recover-route";
 import type { TripDoc } from "../src/domain/trip-doc";
@@ -227,6 +227,21 @@ describe("failure handling", () => {
 });
 
 describe("revalidate", () => {
+  it("refuses a bad body, an unknown trip and a trip in the wrong state before any charge", async () => {
+    const s = await setup();
+    const bad = await precheckRevalidate({}, s.deps);
+    expect(bad).toMatchObject({ status: 422, body: { error: "INVALID_REQUEST", charged: false } });
+    const unknown = await precheckRevalidate({ trip_id: "trp_000000000000000000000000" }, s.deps);
+    expect(unknown).toMatchObject({ status: 404, body: { reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } });
+
+    const prep = await prepare(s, baseIntent());
+    expect(await precheckRevalidate({ trip_id: prep.tripId }, s.deps)).toBeNull();
+    const body = commitBody(prep.tripId!, prep);
+    await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
+    const committed = await precheckRevalidate({ trip_id: prep.tripId }, s.deps);
+    expect(committed).toMatchObject({ status: 409, body: { error: "TRIP_STATE_CONFLICT", state: "COMMITTED", charged: false } });
+  });
+
   it("returns the same manifest when nothing moved", async () => {
     const s = await setup();
     const prep = await prepare(s, baseIntent());

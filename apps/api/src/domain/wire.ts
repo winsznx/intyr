@@ -5,7 +5,7 @@ import type { DomainHandlers } from "./index";
 import { createAdapterRegistry } from "./adapters";
 import { TripStore } from "./store";
 import type { ServiceDeps } from "./service/context";
-import { parseCheck, parseIntent, invalid, runCheck, runPrepare, runRevalidate, tripOwner } from "./service/prepare";
+import { parseCheck, parseIntent, invalid, precheckRevalidate, runCheck, runPrepare, runRevalidate, tripOwner } from "./service/prepare";
 import { precheckCommit, reconcileUnknownTrips, runCommit } from "./service/commit";
 import type { PaymentSession } from "../payments/sessions";
 import { anchorHash, reconcileAnchors } from "../anchor";
@@ -89,7 +89,10 @@ export function createDomain(env: Env, environment: Environment): Domain {
         return runPrepare(p.value, ctx, deps, await validSession(store, ctx.sandboxSessionId, deps.now()));
       },
     },
-    "POST /v1/trips/revalidate": { handler: (ctx) => runRevalidate(ctx.body, ctx, deps) },
+    "POST /v1/trips/revalidate": {
+      precheck: (body) => precheckRevalidate(body, deps),
+      handler: (ctx) => runRevalidate(ctx.body, ctx, deps),
+    },
     "POST /v1/trips/commit": {
       precheck: (body) => precheckCommit(body, deps),
       handler: (ctx) => runCommit(ctx.body, ctx, deps),
