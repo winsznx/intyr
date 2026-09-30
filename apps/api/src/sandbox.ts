@@ -1,3 +1,4 @@
+import { SimulatorAdapter } from "@intyr/adapters";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
@@ -136,6 +137,16 @@ export function mountSandboxActions(app: Hono<{ Bindings: Env }>, deps: { db: D1
       }
     });
     return c.json({ approval_id: approvalId, decision: parsed.data.decision, manifest_hash: parsed.data.manifest_hash, approved_by: "SESSION_APPROVER" });
+  });
+
+  app.get("/sandbox/v1/evidence/sim/:seed/orders", async (c) => {
+    const seed = Number(c.req.param("seed"));
+    if (!Number.isInteger(seed) || seed < 0 || seed > 2 ** 31 - 1) return c.json({ error: "INVALID_REQUEST", message: "seed must be an integer between 0 and 2147483647." }, 422);
+    const service = deps.service();
+    if (!service) return c.json({ error: "NOT_AVAILABLE", message: "The signing key is not configured." }, 503);
+    const simulator = service.adapters.all().find((a): a is SimulatorAdapter => a instanceof SimulatorAdapter);
+    if (!simulator) return c.json({ error: "NOT_AVAILABLE" }, 503);
+    return c.json({ seed, orders: await simulator.auditOrders(String(seed)) });
   });
 
   app.get("/sandbox/v1/demo/scenarios", (c) => c.json({ items: Object.entries(DEMO_SCENARIOS).map(([id, s]) => ({ id, label: s.label })) }));

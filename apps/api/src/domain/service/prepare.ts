@@ -171,24 +171,23 @@ export type ComponentPlan = { request: ComponentRequest; adapter: IntyrAdapter }
 export function buildComponentRequests(intent: PublicTripIntent, tripId: string, deps: ServiceDeps): { plans: ComponentPlan[]; unsupported: string[] } {
   const plans: ComponentPlan[] = [];
   const unsupported: string[] = [];
-  const faultsByIndex = new Map<number, { fault: SimScenario }>();
-  for (const f of intent.scenario?.faults ?? []) faultsByIndex.set(f.component_index, { fault: f.fault as SimScenario });
+  const faultsByIndex = new Map<number, SimScenario>();
+  for (const f of intent.scenario?.faults ?? []) faultsByIndex.set(f.component_index, f.fault as SimScenario);
   const seed = String(intent.scenario?.seed ?? tripId);
+  const simulated = intent.scenario !== undefined;
   intent.components.forEach((c, index) => {
     const component_id = componentIdOf(c.type, index);
     if (c.type !== "FLIGHT" && c.type !== "HOTEL" && c.type !== "GROUND") {
       unsupported.push(component_id);
       return;
     }
-    const fault = faultsByIndex.get(index);
-    const simulated = fault !== undefined;
     const adapter = adapterFor(deps, c.type, simulated);
     if (!adapter) {
       unsupported.push(component_id);
       return;
     }
     const base = { component_id, type: c.type, currency: intent.currency } as const;
-    const sim = fault ? { scenario: fault.fault, seed } : undefined;
+    const sim = adapter.metadata().leg_class === "SIMULATED" ? { scenario: faultsByIndex.get(index) ?? ("HAPPY" as const), seed } : undefined;
     let request: ComponentRequest;
     if (c.type === "FLIGHT") {
       request = { ...base, origin: c.origin, destination: c.destination, depart_date: c.depart_date, adults: c.passengers, hold: c.hold_if_available };
