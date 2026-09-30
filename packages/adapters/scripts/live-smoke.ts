@@ -13,11 +13,13 @@ import { join } from "node:path";
 import { DuffelFlightsAdapter, LiteApiHotelsAdapter, SANDBOX_TRAVELER, type IntyrAdapter, type PreparedLeg } from "../src";
 
 function loadDevVars(): void {
-  const path = join(import.meta.dirname, "../../../.dev.vars");
-  if (!existsSync(path)) return;
-  for (const line of readFileSync(path, "utf8").split("\n")) {
-    const m = /^([A-Z_]+)=(.*)$/.exec(line.trim());
-    if (m && !process.env[m[1]!]) process.env[m[1]!] = m[2]!.replace(/^"|"$/g, "");
+  for (const rel of ["../../../.dev.vars", "../../../apps/api/.dev.vars"]) {
+    const path = join(import.meta.dirname, rel);
+    if (!existsSync(path)) continue;
+    for (const line of readFileSync(path, "utf8").split("\n")) {
+      const m = /^([A-Z_]+)=(.*)$/.exec(line.trim());
+      if (m && !process.env[m[1]!]) process.env[m[1]!] = m[2]!.replace(/^"|"$/g, "");
+    }
   }
 }
 
@@ -49,7 +51,8 @@ async function main(): Promise<void> {
   const duffel = new DuffelFlightsAdapter({ token: process.env.DUFFEL_TOKEN });
   if (duffel.metadata().configured) {
     // JFK to EWR returns hold-capable offers in Duffel test mode.
-    const prep = await duffel.prepare({ component_id: "flight-1", type: "FLIGHT", origin: "JFK", destination: "EWR", depart_date: days(30), adults: 1, currency: "USD" });
+    // Duffel test-mode offers are priced in EUR.
+    const prep = await duffel.prepare({ component_id: "flight-1", type: "FLIGHT", origin: "JFK", destination: "EWR", depart_date: days(30), adults: 1, currency: "EUR" });
     show("duffel prepare", prep.ok ? { ...prep.leg, untrusted_notes: prep.leg.untrusted_notes } : prep);
     if (prep.ok) await lifecycle(duffel, prep.leg, `${ref}_duffel`);
   } else {
@@ -58,7 +61,7 @@ async function main(): Promise<void> {
 
   const lite = new LiteApiHotelsAdapter({ apiKey: process.env.LITEAPI_KEY });
   if (lite.metadata().configured) {
-    const prep = await lite.prepare({ component_id: "hotel-2", type: "HOTEL", check_in: days(30), check_out: days(32), adults: 1, currency: "USD" });
+    const prep = await lite.prepare({ component_id: "hotel-2", type: "HOTEL", destination: "London", check_in: days(30), check_out: days(32), adults: 1, currency: "USD" });
     show("liteapi prepare", prep);
     if (prep.ok) await lifecycle(lite, prep.leg, `${ref}_liteapi`);
   } else {

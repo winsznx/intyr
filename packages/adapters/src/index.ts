@@ -6,7 +6,7 @@ import { SimulatorAdapter, type SimulatorStore } from "./simulator";
 
 export * from "./contract";
 export { CallerSuppliedAdapter, CallerSuppliedLegError, callerPreparationMode, legFromCallerSupplied, validateCallerLeg } from "./caller-supplied";
-export { DuffelFlightsAdapter, type DuffelOptions } from "./duffel";
+export { ageOn, DuffelFlightsAdapter, type DuffelOptions } from "./duffel";
 export { LiteApiHotelsAdapter, type LiteApiOptions } from "./liteapi";
 export { MemorySimulatorStore, SimulatorAdapter, type SimOrder, type SimOrderStatus, type SimulatorOptions, type SimulatorStore } from "./simulator";
 export { toDecimal, toMoney } from "./util";

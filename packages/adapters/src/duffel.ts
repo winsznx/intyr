@@ -90,6 +90,16 @@ interface DuffelError {
   message: string | null;
 }
 
+/** Whole years between a date of birth and the travel date, as airlines count age. */
+export function ageOn(bornOn: string, travelDate: string): number {
+  const born = new Date(`${bornOn}T00:00:00Z`);
+  const on = new Date(`${travelDate}T00:00:00Z`);
+  let age = on.getUTCFullYear() - born.getUTCFullYear();
+  const beforeBirthday = on.getUTCMonth() < born.getUTCMonth() || (on.getUTCMonth() === born.getUTCMonth() && on.getUTCDate() < born.getUTCDate());
+  if (beforeBirthday) age -= 1;
+  return age;
+}
+
 function firstError(body: unknown): DuffelError {
   const err = rec(arr(rec(body).errors)[0]);
   return { code: str(err.code), message: str(err.message) ?? str(err.title) };
@@ -189,7 +199,8 @@ export class DuffelFlightsAdapter implements IntyrAdapter {
         requestBody = {
           data: {
             slices: [{ origin: req.origin, destination: req.destination, departure_date: req.depart_date }],
-            passengers: Array.from({ length: Math.max(1, req.adults) }, () => ({ age: 30 })),
+            // Duffel checks the searched age against the traveler's date of birth at booking time.
+            passengers: Array.from({ length: Math.max(1, req.adults) }, () => ({ age: ageOn(SANDBOX_TRAVELER.born_on, req.depart_date!) })),
             cabin_class: "economy",
             max_connections: 1,
           },

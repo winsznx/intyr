@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ageOn,
   callerPreparationMode,
   CallerSuppliedLegError,
   DuffelFlightsAdapter,
@@ -52,6 +53,11 @@ function commitReq(leg: PreparedLeg) {
 }
 
 describe("duffel-flights", () => {
+  it("searches with the age the traveler has on the travel date", () => {
+    expect(ageOn("1990-12-10", "2026-11-01")).toBe(35);
+    expect(ageOn("1990-12-10", "2026-12-10")).toBe(36);
+  });
+
   it("refuses to run without a token and refuses live tokens", async () => {
     expect(new DuffelFlightsAdapter({ token: undefined }).metadata().configured).toBe(false);
     const live = new DuffelFlightsAdapter({ token: "duffel_live_x" });
