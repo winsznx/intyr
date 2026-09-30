@@ -10,7 +10,8 @@ import { precheckCommit, reconcileUnknownTrips, runCommit } from "./service/comm
 import type { PaymentSession } from "../payments/sessions";
 import { precheckRecover, runRecover } from "./service/recover-route";
 
-const KEY_ID = "intyr-2026-09-a";
+export const KEY_ID = "intyr-2026-09-a";
+export const KEY_VALID_FROM = "2026-09-30T00:00:00Z";
 
 async function validSession(store: TripStore, raw: string | undefined, now: Date): Promise<string | undefined> {
   if (!raw) return undefined;

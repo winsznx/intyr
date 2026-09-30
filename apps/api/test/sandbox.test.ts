@@ -94,3 +94,19 @@ describe("sandbox demo and approval", () => {
     expect(body.current_manifest.manifest_hash).toMatch(/^sha256:/);
   });
 });
+
+describe("proof routes", () => {
+  it("serves the public key and verifies a stored manifest, then rejects a tampered copy", async () => {
+    const { app, cookie } = await appWithService();
+    const keys = (await (await app.request("https://x.test/.well-known/intyr-signing-keys.json")).json()) as { keys: Array<{ public_key: string }> };
+    expect(keys.keys).toHaveLength(1);
+    const run = (await (await app.request("https://x.test/sandbox/v1/demo/run", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ scenario: "happy" }) })).json()) as { trip_id: string };
+    const trip = (await (await app.request(`https://x.test/sandbox/v1/trips/${run.trip_id}`, { headers: { cookie } })).json()) as { final_manifest_id: string };
+    const good = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ manifest_id: trip.final_manifest_id }) })).json()) as { proof_state: string };
+    expect(good.proof_state).toBe("PROOF_VERIFIED");
+    const stored = (await (await app.request(`https://x.test/sandbox/v1/manifests/${trip.final_manifest_id}`)).json()) as { signed: { payload: { stranded_spend_minor: number } } };
+    stored.signed.payload.stranded_spend_minor = 999;
+    const bad = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ signed: stored.signed }) })).json()) as { proof_state: string };
+    expect(bad.proof_state).toBe("HASH_MISMATCH");
+  });
+});

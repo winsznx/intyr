@@ -7,7 +7,8 @@ import type { Ladder, PaidRoute } from "./payments/ladder";
 import { getOperation, getSessionById } from "./payments/sessions";
 import { notAvailable, type DomainHandlers, type RouteKey } from "./domain";
 import { mountSandbox, mountSandboxActions } from "./sandbox";
-import { buildServiceDeps } from "./domain/wire";
+import { KEY_ID, KEY_VALID_FROM, buildServiceDeps } from "./domain/wire";
+import { publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type CommitManifest, type TransactionManifest } from "@intyr/core";
 import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
 
@@ -59,6 +60,11 @@ function pricesPayload(n: NetworkDeps) {
       requires_chain_confirmation: p.requires_chain_confirmation,
     })),
   };
+}
+
+function publishedKeys(env: Env): PublishedKey[] {
+  if (!env.MANIFEST_SIGNING_JWK) return [];
+  return [publishedKey(signingKeyFromJwkJson(KEY_ID, env.MANIFEST_SIGNING_JWK), KEY_VALID_FROM)];
 }
 
 export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
@@ -184,6 +190,19 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         note: "Payer classes: EXTERNAL_ANON and EXTERNAL_ORG are payers the team does not control. INTERNAL_VALIDATION is team-controlled and is never counted as adoption.",
       });
     });
+    app.post(`${prefix}/manifests/verify`, async (c) => {
+      const keys = publishedKeys(deps.env);
+      const body = (await c.req.json().catch(() => null)) as { manifest_id?: string; signed?: unknown } | null;
+      let signed: unknown = body?.signed;
+      if (!signed && body?.manifest_id) {
+        const row = await store.getManifest(body.manifest_id);
+        if (row) signed = JSON.parse(row.signed_json);
+      }
+      if (!signed || typeof signed !== "object") return c.json({ error: "INVALID_REQUEST", message: "Send {signed} or {manifest_id}." }, 422);
+      const result = await verifyManifestDocument(signed as Signed<CommitManifest | TransactionManifest>, keys);
+      const proof_state = result.ok ? "PROOF_VERIFIED" : result.reason === "HASH_MISMATCH" ? "HASH_MISMATCH" : "SIGNATURE_INVALID";
+      return c.json({ proof_state, integrity: result.ok ? "VALID" : "INVALID", ...(result.ok ? {} : { reason: result.reason }), checked: ["payload_hash", "signature", "component_root"], keys: keys.map((k) => k.key_id), note: "Integrity and timing only. This does not prove the supplier told the truth." });
+    });
     app.get(`${prefix}/manifests/:id`, async (c) => {
       const row = await store.getManifest(c.req.param("id"));
       if (!row || row.network !== n.net.name) return c.json({ error: "NOT_FOUND" }, 404);
@@ -204,6 +223,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
     });
   }
 
+  app.get("/.well-known/intyr-signing-keys.json", (c) => c.json({ keys: publishedKeys(deps.env), algorithm: "Ed25519", contexts: ["intyr/plan/v1", "intyr/manifest/v1", "intyr/transaction/v1", "intyr/status/v1", "intyr/decision/v1"], note: "Signed bytes are the context, a newline, then the RFC 8785 canonical JSON of the payload." }));
   app.get("/healthz", (c) => c.json({ ok: true, networks: nets.map((n) => n.net.name) }));
   app.get("/version", (c) => c.json({ ...deps.version, networks: nets.map((n) => ({ name: n.net.name, caip2: n.net.caip2, usdc_asset_id: n.net.usdcAssetId })) }));
 
