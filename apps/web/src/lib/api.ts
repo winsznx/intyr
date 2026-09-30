@@ -1,6 +1,7 @@
 import type {
   DemoRun,
   DemoScenario,
+  Environment,
   EvidenceRun,
   GateDecision,
   ManifestDocument,
@@ -21,10 +22,21 @@ import { normalizeList, normalizeTrip } from "./trip-wire";
 
 /**
  * The UI works against the sandbox mirror (TestNet, server-held payer, cookie session).
- * The public verifier reads manifests through /v1, which resolves ids on both networks.
+ * /v1 holds MainNet records and /sandbox/v1 holds TestNet records. Each host checks
+ * anchors on its own network only.
  */
 export const SANDBOX = "/sandbox/v1";
 export const PUBLIC = "/v1";
+
+export type ApiBase = typeof PUBLIC | typeof SANDBOX;
+
+export function baseForEnvironment(environment: Environment | undefined): ApiBase | undefined {
+  if (environment === "TESTNET") return SANDBOX;
+  if (environment === "MAINNET") return PUBLIC;
+  return undefined;
+}
+
+export type VerifyBody = { manifest_id: string } | { signed: Record<string, unknown> } | { txid: string };
 
 export interface ApiErrorBody {
   error?: string;
@@ -159,10 +171,15 @@ export const api = {
   runDemo: (scenario: string, seed?: number) => sandbox<DemoRun>("POST", "/demo/run", seed === undefined ? { scenario } : { scenario, seed }),
 
   getManifest: (manifestId: string, signal?: AbortSignal) => request<ManifestDocument>("GET", `${PUBLIC}/manifests/${encodeURIComponent(manifestId)}`, undefined, signal),
-  verifyManifest: (body: { manifest_id?: string; manifest?: unknown; txid?: string }, base: typeof PUBLIC | typeof SANDBOX = PUBLIC) =>
-    request<VerifyResult>("POST", `${base}/manifests/verify`, body),
-  /** Mainnet first. A TestNet id resolves only on the sandbox host, so a 404 falls through to it. */
-  verifyAnywhere: async (body: { manifest_id?: string; manifest?: unknown; txid?: string }): Promise<VerifyResult & { answered_by: string }> => {
+  verifyManifest: (body: VerifyBody, base: ApiBase = PUBLIC) => request<VerifyResult>("POST", `${base}/manifests/verify`, body),
+  /**
+   * Asks the host of the record's own network when it is known, because the other host
+   * would look for the anchor on the wrong chain. Otherwise MainNet first, and a 404 falls
+   * through to the sandbox host.
+   */
+  verifyAnywhere: async (body: VerifyBody, environment?: Environment): Promise<VerifyResult & { answered_by: ApiBase }> => {
+    const known = baseForEnvironment(environment);
+    if (known) return { ...(await request<VerifyResult>("POST", `${known}/manifests/verify`, body)), answered_by: known };
     try {
       return { ...(await request<VerifyResult>("POST", `${PUBLIC}/manifests/verify`, body)), answered_by: PUBLIC };
     } catch (error) {
@@ -170,7 +187,7 @@ export const api = {
       return { ...(await request<VerifyResult>("POST", `${SANDBOX}/manifests/verify`, body)), answered_by: SANDBOX };
     }
   },
-  getPrices: (base: typeof PUBLIC | typeof SANDBOX = PUBLIC, signal?: AbortSignal) => request<PriceTable>("GET", `${base}/prices`, undefined, signal),
+  getPrices: (base: ApiBase = PUBLIC, signal?: AbortSignal) => request<PriceTable>("GET", `${base}/prices`, undefined, signal),
   getStats: (signal?: AbortSignal) => request<PublicStats>("GET", `${PUBLIC}/stats/public`, undefined, signal),
   getEvidenceRun: (runId: string, signal?: AbortSignal) => request<EvidenceRun>("GET", `${PUBLIC}/evidence/runs/${encodeURIComponent(runId)}`, undefined, signal),
   getVersion: (signal?: AbortSignal) => request<VersionInfo>("GET", "/version", undefined, signal),

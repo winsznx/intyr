@@ -17,7 +17,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { ApiError, PUBLIC, SANDBOX, api, type ApiErrorBody } from "../../lib/api";
+import { ApiError, PUBLIC, SANDBOX, api, baseForEnvironment, type ApiBase, type ApiErrorBody, type VerifyBody } from "../../lib/api";
 import { BrowserProofPanel, browserOverride, useBrowserProof, type StoredManifest } from "../../components/browser-proof-panel";
 import { COMPONENT_TYPE, PROOF_STATE, describeReason, type Tone } from "../../lib/labels";
 import { shortId } from "../../lib/format";
@@ -285,6 +285,7 @@ const CHECK_NAMES: Record<string, string> = {
   payload_hash: "The payload hashes to the recorded hash",
   signature: "Signed by a published Intyr key",
   component_root: "The component root matches the legs",
+  decisions_root: "The decision root matches the decision log",
   anchor_note: "The hash is anchored in an Algorand transaction note",
 };
 
@@ -326,14 +327,17 @@ function verifyCommand(body: string, base: string = PUBLIC): string {
 
 function ManifestProofPage({ manifestId }: { manifestId: string }) {
   const manifest = useResource(`manifest:${manifestId}`, (signal) => loadManifest(manifestId, signal));
-  const verification = useResource(`verify:${manifestId}`, () => api.verifyAnywhere({ manifest_id: manifestId }));
+  const view = readManifest(manifest.data?.doc);
+  const verification = useResource(`verify:${manifestId}:${view.environment ?? "unknown"}`, () => api.verifyAnywhere({ manifest_id: manifestId }, view.environment), {
+    enabled: manifest.loaded,
+  });
   const browser = useBrowserProof(manifestId, manifest.data?.doc as StoredManifest | undefined);
   const override = browserOverride(browser.data);
   const shownVerification = override && verification.data ? { ...verification, data: { ...verification.data, proof_state: override } } : verification;
-  const view = readManifest(manifest.data?.doc);
   const rawHref = manifest.data?.path ?? `${PUBLIC}/manifests/${encodeURIComponent(manifestId)}`;
 
-  if (!manifest.loaded) {
+  const awaitingFallback = manifest.error !== undefined && !isNotFound(manifest.error) && !verification.loaded;
+  if (!manifest.loaded || awaitingFallback) {
     return (
       <div className="container section-tight pf-page">
         <BackToVerifier />
@@ -1010,9 +1014,16 @@ function CheckList({ result, pending, failed }: { result: VerifyView | undefined
 type VerifyInput =
   | { kind: "manifest_id"; id: string }
   | { kind: "txid"; txid: string }
-  | { kind: "manifest_json"; manifest: Record<string, unknown> };
+  | { kind: "manifest_json"; manifest: Record<string, unknown>; signed: Record<string, unknown> };
 
 type ParseResult = { ok: true; input: VerifyInput } | { ok: false; message: string };
+
+/** The verifier takes the signed part only: the `signed` field of a served manifest, or a bare `{payload, payload_hash, signature}`. */
+function signedPart(doc: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (isRecord(doc.signed)) return doc.signed;
+  if (isRecord(doc.payload) && isRecord(doc.signature)) return doc;
+  return undefined;
+}
 
 /** Algorand transaction ids are 52 characters of base32 without padding. */
 const TXID = /^[A-Z2-7]{52}$/;
@@ -1030,7 +1041,14 @@ function parseInput(raw: string): ParseResult | null {
       return { ok: false, message: `This is not valid JSON. ${error instanceof Error ? error.message : ""}`.trim() };
     }
     if (!isRecord(parsed)) return { ok: false, message: "Paste one manifest object, not a list or a single value." };
-    return { ok: true, input: { kind: "manifest_json", manifest: parsed } };
+    const signed = signedPart(parsed);
+    if (!signed) {
+      return {
+        ok: false,
+        message: "This JSON has no signed part. Paste the manifest as the API serves it, or its signed object with payload, payload_hash and signature.",
+      };
+    }
+    return { ok: true, input: { kind: "manifest_json", manifest: parsed, signed } };
   }
   const fromUrl = VERIFY_URL.exec(value)?.[1];
   if (fromUrl) {
@@ -1049,13 +1067,13 @@ function parseInput(raw: string): ParseResult | null {
 const DETECTED: Record<VerifyInput["kind"], string> = {
   manifest_id: "Reads as a manifest id. Verify opens its public record.",
   txid: "Reads as an Algorand transaction id. The verifier looks up the manifest anchored in it.",
-  manifest_json: "Reads as manifest JSON. It is sent to the verifier exactly as pasted.",
+  manifest_json: "Reads as manifest JSON. Its signed part is sent to the verifier unchanged.",
 };
 
 type Submission =
   | { status: "idle" }
   | { status: "running"; input: VerifyInput }
-  | { status: "done"; input: VerifyInput; result: VerifyResult }
+  | { status: "done"; input: VerifyInput; result: VerifyResult & { answered_by: ApiBase } }
   | { status: "failed"; input: VerifyInput; error: Error };
 
 function VerifyFormPage() {
@@ -1083,8 +1101,8 @@ function VerifyFormPage() {
   const run = (input: VerifyInput) => {
     const request = ++requestRef.current;
     setSubmission({ status: "running", input });
-    const body = input.kind === "txid" ? { txid: input.txid } : input.kind === "manifest_json" ? { manifest: input.manifest } : { manifest_id: input.id };
-    void api.verifyAnywhere(body).then(
+    const body: VerifyBody = input.kind === "txid" ? { txid: input.txid } : input.kind === "manifest_json" ? { signed: input.signed } : { manifest_id: input.id };
+    void api.verifyAnywhere(body, input.kind === "manifest_json" ? readManifest(input.manifest).environment : undefined).then(
       (result) => {
         if (request === requestRef.current) setSubmission({ status: "done", input, result });
       },
@@ -1234,9 +1252,9 @@ function VerifyFormPage() {
               loading: submission.status === "running",
             }}
             onRecheck={() => run(submission.input)}
-            command={commandFor(submission.input)}
+            command={commandFor(submission.input, submission.status === "done" ? submission.result.answered_by : undefined)}
             commandNote={
-              submission.input.kind === "manifest_json" ? "Save the pasted manifest as manifest.json in the current folder first. The command wraps it as the manifest field." : undefined
+              submission.input.kind === "manifest_json" ? "Save the pasted manifest as manifest.json in the current folder first. The command needs jq and sends only the signed part." : undefined
             }
           />
         </section>
@@ -1251,8 +1269,9 @@ function subjectSentence(input: VerifyInput): string {
   return `The pasted manifest. ${claimSentence(readManifest(input.manifest))}`;
 }
 
-function commandFor(input: VerifyInput): string {
-  if (input.kind === "txid") return verifyCommand(JSON.stringify({ txid: input.txid }));
-  if (input.kind === "manifest_id") return verifyCommand(JSON.stringify({ manifest_id: input.id }));
-  return `printf '{"manifest":%s}' "$(cat manifest.json)" | curl -s -X POST ${window.location.origin}${PUBLIC}/manifests/verify -H 'content-type: application/json' --data-binary @-`;
+function commandFor(input: VerifyInput, answeredBy: ApiBase | undefined): string {
+  if (input.kind === "txid") return verifyCommand(JSON.stringify({ txid: input.txid }), answeredBy);
+  if (input.kind === "manifest_id") return verifyCommand(JSON.stringify({ manifest_id: input.id }), answeredBy);
+  const base = baseForEnvironment(readManifest(input.manifest).environment) ?? answeredBy ?? PUBLIC;
+  return `jq -c '{signed: (.signed // .)}' manifest.json | curl -s -X POST ${window.location.origin}${base}/manifests/verify -H 'content-type: application/json' --data-binary @-`;
 }

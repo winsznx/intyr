@@ -61,9 +61,11 @@ Every rail also carries its leg class and evidence grade in words, for example "
 
 ## Proof in the browser
 
-`/verify/:manifestId` runs `@intyr/verifier` in the browser. It checks the Ed25519 signature against `/.well-known/intyr-signing-keys.json` and the content roots with WebCrypto, then reads the anchor and any payments from a public Algorand node, never from Intyr's server. A browser result of `SIGNATURE_INVALID` or `HASH_MISMATCH` overrides whatever the server says. The server result from `POST /v1/manifests/verify` is shown below it, and for TestNet ids the page falls back to `/sandbox/v1`.
+`/verify/:manifestId` runs `@intyr/verifier` in the browser. It checks the Ed25519 signature against `/.well-known/intyr-signing-keys.json` and the content roots with WebCrypto, then reads the anchor and any payments from a public Algorand node, never from Intyr's server. A browser result of `SIGNATURE_INVALID` or `HASH_MISMATCH` overrides whatever the server says. The server result is shown below it, from the verify route of the manifest's own network: `/v1` for MainNet records and `/sandbox/v1` for TestNet records. Each host checks anchors on its own chain only and answers 404 for the other network's ids.
 
-Today every sandbox manifest verifies as `PROOF_PARTIAL`, "Signature valid, not anchored": the signature and roots check out, and the TestNet anchor account is not funded yet, so no anchor transaction exists. The page says that plainly and does not list the anchor claim under "What this proves".
+`/verify` takes a manifest id, an anchor transaction id or the manifest JSON. Pasted JSON is sent as its signed part (`{signed}`) to the host its payload names. A transaction id is tried on `/v1` first and then on `/sandbox/v1`.
+
+Sandbox manifests are anchored on TestNet by a separate note transaction from the published anchor account, and read `PROOF_VERIFIED` once it confirms. Before that, or when no anchor was recorded, the receipt reads `PROOF_PARTIAL`, "Signature valid, not anchored", and the page does not list the anchor claim under "What this proves".
 
 ## Reviewer path through the UI
 
