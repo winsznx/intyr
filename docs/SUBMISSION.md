@@ -102,6 +102,14 @@ RUN-001, on 2026-10-01, was a team-controlled payment, labeled `INTERNAL_VALIDAT
 Check it without trusting Intyr's server: `pnpm --filter @intyr/verifier verify pln_357c45b828fabcb25b5e271e`
 returns `PROOF_VERIFIED`. The payment itself can be read from any Algorand indexer at the txid above.
 
+After this settle, GoPlausible lists `POST https://intyr.timjosh507.workers.dev/v1/trips/check` in the Bazaar,
+on Algorand Mainnet with the challenge tag. The tagged 24-hour challenge leaderboard showed Intyr at rank 24
+with 1 settle and 0.10 USDC. That volume is the team's own payment. It is labeled `INTERNAL_VALIDATION` in
+`/v1/stats/public`, and it is not adoption. The team won't add self-paid volume to move the leaderboard. The
+Bazaar entry kept the route description from the first settle, which still says "a safe commit order". The
+current description is more careful, and a listing refresh from the merchant dashboard updates it
+`[OWNER: optional refresh]`.
+
 ## How to check a record yourself
 
 ```sh
