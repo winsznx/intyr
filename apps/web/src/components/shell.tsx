@@ -74,8 +74,8 @@ function SiteFooter() {
     <footer className="site-footer">
       <div className="container site-footer-inner">
         <p style={{ maxWidth: 520 }}>
-          Intyr is a hackathon build for the Algorand Global x402 Challenge. Suppliers in this release are sandbox or simulated, and no trip is ever
-          insured or guaranteed.
+          Intyr is a hackathon build for the Algorand Global x402 Challenge. Suppliers in this release are sandbox or simulated, and no bond or
+          insurance covers any trip.
         </p>
         <nav aria-label="Footer">
           <Link to="/docs/quickstart">Quickstart</Link>

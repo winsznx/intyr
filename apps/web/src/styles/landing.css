@@ -1,0 +1,929 @@
+/* Landing page and quickstart. */
+
+/* Shared section pieces */
+.lp-head-main {
+  display: grid;
+  justify-items: start;
+  gap: 24px;
+}
+
+.lp-head-aside {
+  display: grid;
+  justify-items: start;
+  gap: 20px;
+}
+
+.lp-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.lp-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 32px;
+}
+
+.lp-card .body {
+  max-width: 520px;
+}
+
+.lp-footnote {
+  max-width: 760px;
+  margin-top: 28px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+/* Hero (reference S1) */
+.lp-hero {
+  padding: 64px 0 88px;
+}
+
+.lp-hero-head {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.lp-hero-head .badge {
+  max-width: 100%;
+}
+
+.lp-hero-title {
+  max-width: 860px;
+  margin-top: 24px;
+}
+
+.lp-hero-sub {
+  max-width: 680px;
+  margin-top: 24px;
+}
+
+.lp-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 16px;
+  margin-top: 32px;
+}
+
+.lp-frame {
+  margin-top: 60px;
+}
+
+.lp-frame-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.94fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.lp-frame-rails {
+  display: flex;
+  align-items: center;
+  padding: 32px 28px;
+  border-radius: var(--r-20);
+  background: linear-gradient(180deg, var(--sky-a) 0%, var(--sky-b) 100%);
+}
+
+.lp-frame-card {
+  width: 100%;
+  min-width: 0;
+  padding: 22px 24px 16px;
+  border-radius: var(--r-16);
+  background: var(--canvas);
+  box-shadow: var(--shadow-float);
+  text-align: left;
+}
+
+.lp-frame-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 18px;
+}
+
+.lp-frame-card-sub {
+  max-width: 460px;
+  margin-top: 2px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* The hero card is narrower than a trip page, so its rails give the label column priority. */
+.lp-frame-card .rails {
+  --rail-cols: minmax(200px, 1.6fr) minmax(56px, 1fr) 2px minmax(56px, 1fr) minmax(150px, auto);
+}
+
+.lp-frame-card .rail-price:empty {
+  display: none;
+}
+
+.lp-frame-code {
+  height: 100%;
+  padding: 24px;
+  border-radius: var(--r-20);
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: left;
+}
+
+.lp-frame-caption {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* Short numbered rows used in the problem cards and the step panel */
+.lp-sequence {
+  margin-top: 12px;
+  padding: 4px 24px 0;
+}
+
+.lp-legs {
+  display: grid;
+}
+
+.lp-leg {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.lp-leg-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.lp-leg-title {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.lp-leg-source {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.lp-leg-status {
+  flex: none;
+  margin-left: auto;
+}
+
+.lp-sequence-result {
+  padding: 14px 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+/* How it works: numbered list with an active row (reference S2) */
+.lp-steps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+  padding: 24px;
+  border-radius: var(--r-40);
+  background: var(--soft);
+}
+
+.lp-step-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.lp-step {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  padding: 16px 20px 16px 16px;
+  border-radius: var(--r-24);
+  text-align: left;
+  color: var(--ink);
+  transition:
+    background-color var(--t-standard) var(--ease),
+    color var(--t-standard) var(--ease);
+}
+
+.lp-step:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.lp-step[aria-selected="true"] {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.lp-step-num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--r-16);
+  background: var(--canvas);
+  font-size: 18px;
+  color: #505050;
+}
+
+.lp-step[aria-selected="true"] .lp-step-num {
+  color: #030303;
+}
+
+.lp-step-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lp-step-title {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+.lp-step-summary {
+  font-size: 15px;
+  line-height: 1.45;
+  color: #404143;
+}
+
+.lp-step[aria-selected="true"] .lp-step-summary {
+  color: #e1e1e1;
+}
+
+.lp-step-panel {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-width: 0;
+  padding: 28px;
+  border-radius: var(--r-24);
+  background: var(--canvas);
+}
+
+.lp-step-panel-head {
+  display: grid;
+  gap: 8px;
+}
+
+.lp-step-route {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.lp-step-panel .lp-legs {
+  border-top: 1px solid var(--divider);
+}
+
+.lp-step-outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.lp-step-note {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* Receipts */
+.lp-checklist {
+  display: grid;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.lp-checklist li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.lp-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-top: -2px;
+  border-radius: 50%;
+}
+
+.lp-mark svg {
+  width: 15px;
+  height: 15px;
+}
+
+.lp-mark-yes {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.lp-mark-no {
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.lp-check-lead {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Limits */
+.lp-limits {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 32px 64px;
+  align-items: start;
+}
+
+.lp-limit-list {
+  display: grid;
+  border-top: 1px solid var(--divider);
+}
+
+.lp-limit-list li {
+  display: grid;
+  gap: 4px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.lp-limit-lead {
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.lp-limit-text {
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* Final call to action */
+.lp-cta {
+  display: grid;
+  justify-items: center;
+  gap: 20px;
+  padding: 80px 40px;
+  text-align: center;
+}
+
+.lp-cta .body-l {
+  max-width: 600px;
+}
+
+.lp-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 16px;
+  margin-top: 12px;
+}
+
+/* Live price list, shared by the landing page and the quickstart */
+.lp-prices {
+  padding: 8px;
+  border-radius: var(--r-32);
+  background: var(--soft);
+}
+
+.lp-prices-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  min-height: 52px;
+  padding: 16px 20px 12px;
+}
+
+.lp-prices-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.lp-prices-meta-skeleton {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.lp-prices-body {
+  padding: 4px 24px;
+  border-radius: var(--r-24);
+  background: var(--canvas);
+}
+
+.lp-price-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+
+.lp-price-table th {
+  padding: 16px 20px 12px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink-3);
+}
+
+.lp-price-table td {
+  padding: 16px 20px 16px 0;
+  border-bottom: 1px solid var(--divider);
+  vertical-align: top;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.lp-price-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.lp-pt-call {
+  width: 30%;
+}
+
+.lp-pt-name {
+  display: block;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.lp-pt-path {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.lp-pt-returns {
+  width: 36%;
+}
+
+.lp-pt-fee {
+  width: 22%;
+}
+
+.lp-price-table .lp-pt-price {
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.lp-price-table td.lp-pt-price {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero" 1;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.lp-price-table td.lp-pt-price .skeleton {
+  margin-left: auto;
+}
+
+.lp-skeleton-lines {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.lp-prices-error {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  min-height: 380px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.lp-prices-error .muted {
+  max-width: 420px;
+}
+
+.lp-prices-note {
+  display: block;
+  padding: 14px 20px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* Quickstart */
+.qs {
+  padding-top: 64px;
+  padding-bottom: 104px;
+}
+
+.qs-head {
+  display: grid;
+  justify-items: start;
+  gap: 20px;
+  max-width: 780px;
+  margin-bottom: 64px;
+}
+
+.qs-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 72px;
+  align-items: start;
+}
+
+.qs-toc {
+  position: sticky;
+  top: 104px;
+}
+
+.qs-toc-label {
+  padding: 0 12px 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.qs-toc ol {
+  display: grid;
+  gap: 2px;
+}
+
+.qs-toc a {
+  display: block;
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+  transition:
+    background-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.qs-toc a:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+.qs-body {
+  display: grid;
+  gap: 72px;
+  min-width: 0;
+  max-width: 820px;
+}
+
+.qs-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  scroll-margin-top: 96px;
+}
+
+.qs-section > h2 {
+  margin-bottom: 4px;
+}
+
+.qs-section > p,
+.qs-bullets li,
+.qs-links li,
+.qs-networks dd,
+.qs-fields dd {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+.qs-section > p code,
+.qs-bullets code,
+.qs-networks code,
+.qs-fields code,
+.qs-section .notice code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--chip);
+  font-size: 0.875em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.qs-code {
+  font-size: 12.5px;
+}
+
+.qs-networks,
+.qs-fields,
+.qs-links {
+  display: grid;
+  border-top: 1px solid var(--divider);
+}
+
+.qs-networks > div,
+.qs-fields > div,
+.qs-links li {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 6px 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.qs-networks dt,
+.qs-fields dt {
+  padding-top: 2px;
+}
+
+.qs-links a {
+  align-self: start;
+  font-size: 14px;
+}
+
+.qs-bullets {
+  display: grid;
+  gap: 10px;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.qs-outcomes {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.qs-outcomes th {
+  padding: 0 20px 10px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--ink-3);
+}
+
+.qs-outcomes td {
+  padding: 14px 20px 14px 0;
+  border-bottom: 1px solid var(--divider);
+  vertical-align: top;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.qs-outcomes td:first-child {
+  white-space: nowrap;
+}
+
+.qs-outcome-action {
+  color: var(--ink);
+}
+
+/* Responsive */
+@media (max-width: 1023px) {
+  .lp-frame-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-steps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+    border-radius: var(--r-32);
+  }
+
+  .qs-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .qs-toc {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .lp-two,
+  .lp-limits {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-hero {
+    padding: 48px 0 72px;
+  }
+}
+
+@media (max-width: 760px) {
+  .lp-price-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .lp-price-table,
+  .lp-price-table tbody {
+    display: block;
+  }
+
+  .lp-price-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .lp-price-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .lp-price-table td {
+    display: block;
+    width: auto;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .lp-price-table .lp-pt-call {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .lp-price-table .lp-pt-price {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .lp-price-table .lp-pt-returns,
+  .lp-price-table .lp-pt-fee {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  .lp-pt-returns::before,
+  .lp-pt-fee::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+
+  .lp-prices-body {
+    padding: 4px 16px;
+  }
+
+  .lp-prices-head {
+    padding: 14px 16px 10px;
+  }
+
+  .lp-prices-note {
+    padding: 12px 16px 10px;
+  }
+}
+
+@media (max-width: 720px) {
+  .lp-frame {
+    margin-top: 40px;
+  }
+
+  .lp-frame-rails {
+    padding: 16px;
+  }
+
+  .lp-frame-card {
+    padding: 16px 16px 12px;
+  }
+
+  .lp-frame-code {
+    padding: 18px;
+  }
+
+  .lp-card {
+    padding: 24px 20px;
+  }
+
+  .lp-sequence {
+    padding: 0 16px;
+  }
+
+  .lp-step {
+    gap: 14px;
+    padding: 12px;
+  }
+
+  .lp-step-num {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    font-size: 16px;
+  }
+
+  .lp-step-title {
+    font-size: 19px;
+  }
+
+  .lp-step-panel {
+    padding: 20px 16px;
+  }
+
+  .lp-cta {
+    padding: 48px 20px;
+  }
+
+  .qs {
+    padding-top: 40px;
+  }
+
+  .qs-head {
+    margin-bottom: 40px;
+  }
+
+  .qs-body {
+    gap: 56px;
+  }
+
+  .qs-networks > div,
+  .qs-fields > div,
+  .qs-links li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .qs-outcomes thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .qs-outcomes,
+  .qs-outcomes tbody,
+  .qs-outcomes tr,
+  .qs-outcomes td {
+    display: block;
+  }
+
+  .qs-outcomes tr {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .qs-outcomes td {
+    padding: 4px 0;
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .lp-hero-actions,
+  .lp-cta-actions {
+    width: 100%;
+  }
+
+  .lp-hero-actions .btn,
+  .lp-cta-actions .btn {
+    width: 100%;
+  }
+
+  .lp-leg {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  /* 86px is the order chip, the icon and their gaps. The status always wraps under the leg name. */
+  .lp-leg-name {
+    flex-basis: calc(100% - 86px);
+  }
+
+  .lp-leg-status {
+    margin-left: 86px;
+  }
+}
