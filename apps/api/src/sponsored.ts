@@ -1,3 +1,4 @@
+import { readBodyWithLimit } from "./body";
 import type { Context, Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { canonicalize, hashValue, newId, sha256Hex } from "@intyr/core";
@@ -29,7 +30,9 @@ export async function runSponsored(
   deps: { db: D1Database; sandboxSessionId: string; now?: () => Date },
 ): Promise<Response> {
   const now = (deps.now ?? (() => new Date()))();
-  const raw = await c.req.text();
+  const read = await readBodyWithLimit(c);
+  if (!read.ok) return read.response;
+  const raw = read.raw;
   let body: unknown;
   try {
     body = raw.length === 0 ? {} : JSON.parse(raw);

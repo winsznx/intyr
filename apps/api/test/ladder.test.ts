@@ -271,6 +271,31 @@ describe("payment ladder", () => {
     expect(poll.refund).toMatchObject({ id: body.refund.id, state: "REQUESTED" });
   });
 
+  it("refuses an oversized body with 413 before any payment is read or any work starts", async () => {
+    const big = JSON.stringify({ pad: "x".repeat(70_000) });
+    const declared = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json" }, body: big });
+    expect(declared.status).toBe(413);
+    expect(await declared.json()).toMatchObject({ error: "PAYLOAD_TOO_LARGE", charged: false, limit_bytes: 65536 });
+    const streamed = await h.app.request(URL_ + "/sandbox/v1/trips/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: new ReadableStream({ start(ctrl) { ctrl.enqueue(new TextEncoder().encode(big)); ctrl.close(); } }),
+      duplex: "half",
+    } as RequestInit);
+    expect(streamed.status).toBe(413);
+    const sessions = await h.db.prepare("SELECT COUNT(*) AS n FROM payment_sessions").first<{ n: number }>();
+    expect(sessions?.n).toBe(0);
+    expect(h.handlerCalls.n).toBe(0);
+  });
+
+  it("serves the agent card the facilitator reads for merchant enrichment", async () => {
+    const res = await h.app.request(URL_ + "/.well-known/agent-card.json");
+    expect(res.status).toBe(200);
+    const card = (await res.json()) as { name: string; payment: { payTo: string }; skills: unknown[] };
+    expect(card).toMatchObject({ name: "Intyr", payment: { payTo: PAY_TO } });
+    expect(card.skills.length).toBeGreaterThan(0);
+  });
+
   it("tags payments from team wallets as INTERNAL_VALIDATION", async () => {
     const payer = newPayer();
     const db = createTestD1();

@@ -275,20 +275,20 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
       });
     });
 
-    app.get("/.well-known/agent.json", (c) => {
-      const origin = new URL(c.req.url).origin;
-      return c.json({
-        name: "Intyr",
-        description:
-          "When an AI agent books a flight, a hotel and a transfer from different suppliers and one fails, Intyr stops or unwinds the rest inside limits set before paying, and leaves a receipt anyone can check.",
-        url: origin,
-        payment: { protocol: "x402", version: 2, network: primary.net.caip2, asset: primary.net.usdcAssetId, payTo: primary.payTo },
-        capabilities: ROUTE_PRICES.map((p, i) => ({ name: p.name, method: "POST", path: routes[i]!.path, price_usdc: atomicToUsdc(p.amountAtomic) })),
-        docs: `${origin}/llms.txt`,
-        openapi: `${origin}/openapi.json`,
-        assurance: { mode: "NONE" },
-      });
+    const agentCard = (origin: string): Record<string, unknown> => ({
+      name: "Intyr",
+      description:
+        "When an AI agent books a flight, a hotel and a transfer from different suppliers and one fails, Intyr stops or unwinds the rest inside limits set before paying, and leaves a receipt anyone can check.",
+      url: origin,
+      payment: { protocol: "x402", version: 2, network: primary.net.caip2, asset: primary.net.usdcAssetId, payTo: primary.payTo },
+      capabilities: ROUTE_PRICES.map((p, i) => ({ name: p.name, method: "POST", path: routes[i]!.path, price_usdc: atomicToUsdc(p.amountAtomic) })),
+      skills: ROUTE_PRICES.map((p) => ({ id: p.name, name: p.name, description: p.description })),
+      docs: `${origin}/llms.txt`,
+      openapi: `${origin}/openapi.json`,
+      assurance: { mode: "NONE" },
     });
+    app.get("/.well-known/agent.json", (c) => c.json(agentCard(new URL(c.req.url).origin)));
+    app.get("/.well-known/agent-card.json", (c) => c.json(agentCard(new URL(c.req.url).origin)));
 
     app.get("/llms.txt", (c) => {
       const origin = new URL(c.req.url).origin;

@@ -6,6 +6,7 @@ import {
 } from "@x402/core/http";
 import type { x402HTTPResourceServer } from "@x402/core/server";
 import { canonicalize, hashValue } from "@intyr/core";
+import { readBodyWithLimit } from "../body";
 import { routePrefix, type NetworkConfig } from "../config";
 import type { FeeFailure, RefundSummary } from "./refunds";
 import { decodeAvmPayment, PaymentDecodeError, type DecodedPayment } from "./decode";
@@ -217,7 +218,9 @@ export function createLadder(deps: LadderDeps) {
 
   return async function handle(c: Context, route: PaidRoute): Promise<Response> {
     const origin = new URL(c.req.url).origin;
-    const rawBody = await c.req.text();
+    const read = await readBodyWithLimit(c);
+    if (!read.ok) return read.response;
+    const rawBody = read.raw;
     let body: unknown;
     try {
       body = rawBody.length === 0 ? {} : JSON.parse(rawBody);
