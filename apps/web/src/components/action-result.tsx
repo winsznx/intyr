@@ -1,5 +1,5 @@
 import { ApiError, type ActionResponse } from "../lib/api";
-import { UNKNOWN_PAYMENT_COPY, describeReason } from "../lib/labels";
+import { PREPARE_FAILURE, UNKNOWN_PAYMENT_COPY, componentLabel, describeReason, humanize } from "../lib/labels";
 import { DecisionChip, Notice, PaymentStateChip, ReasonList, UnknownNotice } from "./ui";
 
 export type ActionOutcome = { ok: true; action: string; response: ActionResponse } | { ok: false; action: string; error: Error };
@@ -14,6 +14,24 @@ export function ActionResult({ outcome }: { outcome: ActionOutcome | null }) {
   if (outcome.ok) {
     const { response } = outcome;
     const decision = response.decision;
+    if (response.failures?.length) {
+      return (
+        <Notice kind="refuse" title="Intyr could not prepare this trip. Nothing was booked.">
+          <ul className="reason-list">
+            {response.failures.map((failure) => (
+              <li key={failure.component_id}>
+                <span>
+                  {componentLabel(failure.component_id)}: {PREPARE_FAILURE[failure.reason] ?? humanize(failure.reason)}
+                  {failure.detail ? ` (${failure.detail})` : null}
+                </span>
+                <code className="meta">{failure.reason}</code>
+              </li>
+            ))}
+          </ul>
+          Change the details of that leg and prepare again.
+        </Notice>
+      );
+    }
     if (response.payment_state === "UNKNOWN") {
       return <Notice kind="unknown">{UNKNOWN_PAYMENT_COPY}</Notice>;
     }

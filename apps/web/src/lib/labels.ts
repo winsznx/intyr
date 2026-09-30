@@ -286,6 +286,21 @@ export const PLAN_VERDICT: Record<string, { label: string; tone: Tone; explain: 
   DO_NOT_COMMIT: { label: "Do not commit", tone: "danger", explain: "At least one leg makes this trip unsafe to commit. The reasons are listed." },
 };
 
+/** Why an adapter could not prepare a leg (`PrepareFailure` in packages/adapters), as a failed prepare reports it. */
+export const PREPARE_FAILURE: Record<string, string> = {
+  NO_OFFER: "The supplier had no availability for these details.",
+  OVER_BUDGET: "Every offer was above the trip's limit.",
+  UNSUPPORTED: "This supplier does not handle this kind of leg.",
+  SUPPLIER_ERROR: "The supplier returned an error.",
+  NOT_CONFIGURED: "This supplier is not set up in this deployment.",
+  INVALID_REQUEST: "The supplier rejected the details of this leg.",
+};
+
+/** Component ids are `<type>-<position>`, as the prepare service assigns them. */
+export function componentLabel(componentId: string): string {
+  return COMPONENT_TYPE[componentId.replace(/-\d+$/, "").toUpperCase()] ?? componentId;
+}
+
 /** True when a reason code has written copy rather than the generic fallback. */
 export function hasReasonCopy(code: string): boolean {
   return Object.hasOwn(REASONS, code);

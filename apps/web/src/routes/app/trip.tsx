@@ -284,7 +284,9 @@ function VerdictStrip({
       explain = review?.reason_codes?.length ? describeReason(review.reason_codes[0] ?? "") : "A person has to decide before anything moves.";
       break;
     case "PREPARATION_FAILED":
-      explain = "No booking was made. The decision log names the component that could not be prepared.";
+      explain = refused
+        ? `No booking was made. ${describeReason(refused.reason_codes?.[0] ?? "COMPONENT_NOT_READY")}`
+        : "No booking was made. At least one leg could not be prepared, so the trip stopped here.";
       break;
     case "CANCELLED":
       explain = "This trip was cancelled. The legs below show what was cancelled.";

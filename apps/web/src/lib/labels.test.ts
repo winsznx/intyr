@@ -9,7 +9,7 @@ import {
   REASON_CODES,
   TRIP_STATES,
 } from "@intyr/core";
-import { COMPONENT_STATE, DECISION, EVIDENCE_GRADE, LEG_CLASS, PREPARATION_MODE, PROOF_STATE, TRIP_STATE, hasReasonCopy } from "./labels";
+import { COMPONENT_STATE, DECISION, EVIDENCE_GRADE, LEG_CLASS, PREPARATION_MODE, PROOF_STATE, TRIP_STATE, componentLabel, hasReasonCopy } from "./labels";
 
 describe("every name in the core vocabulary has UI copy", () => {
   it.each([...TRIP_STATES])("trip state %s", (state) => {
@@ -60,5 +60,17 @@ describe("truth before display", () => {
   it("marks unknown outcomes as still running, never terminal", () => {
     expect(TRIP_STATE.COMMIT_STATUS_UNKNOWN.terminal).toBeFalsy();
     expect(COMPONENT_STATE.COMMIT_STATUS_UNKNOWN.terminal).toBeFalsy();
+  });
+});
+
+describe("componentLabel", () => {
+  it("names a leg from the id the prepare service assigns", () => {
+    expect(componentLabel("hotel-1")).toBe("Hotel");
+    expect(componentLabel("flight-2")).toBe("Flight");
+    expect(componentLabel("ground-3")).toBe("Ground transfer");
+  });
+
+  it("falls back to the raw id for a shape it does not know", () => {
+    expect(componentLabel("leg_7f3a")).toBe("leg_7f3a");
   });
 });

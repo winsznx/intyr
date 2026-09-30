@@ -156,9 +156,10 @@ export function NewTripPage() {
   const set = <K extends keyof Fields>(key: K, value: Fields[K]) => setFields((f) => ({ ...f, [key]: value }));
   const show = (key: string) => (submitted ? errors[key] : undefined);
 
+  /** A failed prepare stays on the form: only its response names the legs that failed, and the fix is to change them here. */
   const finish = (response: ActionResponse, action: string) => {
     const tripId = response.trip_id ?? response.trip?.trip_id;
-    if (tripId) navigate(`/app/trips/${tripId}`);
+    if (tripId && !response.failures?.length) navigate(`/app/trips/${tripId}`);
     else setOutcome({ ok: true, action, response });
   };
 
