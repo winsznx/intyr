@@ -94,6 +94,18 @@ describe("signingKeyFromJwkJson", () => {
     expect(await verifyDocument(doc, "intyr/plan/v1", [publishedKey(generated, NOW.toISOString())])).toEqual({ ok: true });
   });
 
+  it("drops the optional JWK members that workerd refuses to import", async () => {
+    // #given a JWK exported by Node, which carries alg, key_ops and ext
+    const generated = await generateSigningKey("key-2026-10");
+    const secret = JSON.stringify({ ...generated.privateJwk, alg: "Ed25519", key_ops: ["sign"], ext: true });
+
+    // #when it is loaded as a Worker secret
+    const loaded = signingKeyFromJwkJson("key-2026-10", secret);
+
+    // #then only the curve members remain
+    expect(Object.keys(loaded.privateJwk).sort()).toEqual(["crv", "d", "kty", "x"]);
+  });
+
   it("refuses a public-only JWK", async () => {
     const generated = await generateSigningKey("key-2026-10");
     expect(() => signingKeyFromJwkJson("key-2026-10", JSON.stringify(generated.publicJwk))).toThrow(TypeError);

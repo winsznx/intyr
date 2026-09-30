@@ -45,12 +45,20 @@ function signedBytes(context: SignatureContext, payload: unknown): Uint8Array {
   return utf8(`${context}\n${canonicalize(payload)}`);
 }
 
+/**
+ * Keeps only the curve members of an Ed25519 JWK. Runtimes disagree on the
+ * optional ones: Node exports `"alg": "Ed25519"`, which workerd refuses to import.
+ */
+function bareJwk(jwk: JsonWebKey): JsonWebKey {
+  return { kty: "OKP", crv: "Ed25519", ...(jwk.x ? { x: jwk.x } : {}), ...(jwk.d ? { d: jwk.d } : {}) };
+}
+
 export async function generateSigningKey(keyId: string): Promise<SigningKey> {
   const pair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])) as CryptoKeyPair;
   return {
     keyId,
-    privateJwk: (await crypto.subtle.exportKey("jwk", pair.privateKey)) as JsonWebKey,
-    publicJwk: (await crypto.subtle.exportKey("jwk", pair.publicKey)) as JsonWebKey,
+    privateJwk: bareJwk((await crypto.subtle.exportKey("jwk", pair.privateKey)) as JsonWebKey),
+    publicJwk: bareJwk((await crypto.subtle.exportKey("jwk", pair.publicKey)) as JsonWebKey),
   };
 }
 
@@ -63,7 +71,7 @@ export function signingKeyFromJwkJson(keyId: string, privateJwkJson: string): Si
   if (jwk.kty !== "OKP" || jwk.crv !== "Ed25519" || !jwk.d || !jwk.x) {
     throw new TypeError("signingKeyFromJwkJson: expected a private Ed25519 JWK with d and x");
   }
-  return { keyId, privateJwk: jwk, publicJwk: { kty: "OKP", crv: "Ed25519", x: jwk.x } };
+  return { keyId, privateJwk: bareJwk(jwk), publicJwk: bareJwk({ x: jwk.x }) };
 }
 
 export function publicKeyOf(key: SigningKey): string {
@@ -76,7 +84,7 @@ export function publishedKey(key: SigningKey, validFrom: string): PublishedKey {
 }
 
 export async function sign(key: SigningKey, context: SignatureContext, payload: unknown): Promise<Signature> {
-  const privateKey = await crypto.subtle.importKey("jwk", key.privateJwk, { name: "Ed25519" }, false, ["sign"]);
+  const privateKey = await crypto.subtle.importKey("jwk", bareJwk(key.privateJwk), { name: "Ed25519" }, false, ["sign"]);
   const sig = await crypto.subtle.sign({ name: "Ed25519" }, privateKey, signedBytes(context, payload) as BufferSource);
   return { alg: "Ed25519", key_id: key.keyId, context, value: base64url(new Uint8Array(sig)) };
 }
