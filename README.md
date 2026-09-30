@@ -67,6 +67,17 @@ A verified record shows that Intyr signed exactly this content, that it existed 
 and that the listed payments happened as recorded. It does not show that a supplier kept a booking, or that
 supplier or caller data is true.
 
+To check the paid surface itself:
+
+```sh
+pnpm --filter @intyr/verifier check-402            # add --mainnet for /v1
+```
+
+It calls every route listed in `/.well-known/x402` without paying. `check` and `prepare` must answer with a
+`402` that carries x402 V2, the full-hash Algorand network id, USDC, a price a stock client will pay, one
+payTo, the challenge tag, a fee payer and a Bazaar declaration. The routes bound to a trip must refuse an
+unknown trip with `charged: false` before they ask for payment.
+
 ## Status on 2026-09-30
 
 | Part | State |
