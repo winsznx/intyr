@@ -187,7 +187,8 @@ export class LiteApiHotelsAdapter implements IntyrAdapter {
               const offerRate = rec(rt.offerRetailRate);
               const amount = offerRate.amount ?? total.amount;
               const cur = str(offerRate.currency) ?? str(total.currency) ?? currency;
-              return { offerId: str(rt.offerId), amount: typeof amount === "number" ? amount : Number.NaN, currency: cur, hotelId: str(hotel.hotelId) };
+              const refundable = str(rec(rec(arr(rt.rates)[0]).cancellationPolicies).refundableTag) === "RFN";
+              return { offerId: str(rt.offerId), amount: typeof amount === "number" ? amount : Number.NaN, currency: cur, hotelId: str(hotel.hotelId), refundable };
             }),
           )
           .filter((c) => c.offerId !== null && Number.isFinite(c.amount) && c.currency === currency)
@@ -195,8 +196,10 @@ export class LiteApiHotelsAdapter implements IntyrAdapter {
         const within = candidates.filter((c) => req.max_price_minor === undefined || toMoney(c.amount, currency).amount_minor <= req.max_price_minor);
         if (candidates.length === 0) return { ok: false, reason: "NO_OFFER", detail: "no bookable rate returned", retryable: true };
         if (within.length === 0) return { ok: false, reason: "OVER_BUDGET", detail: "no rate within the price cap", retryable: false };
-        offerId = within[0]!.offerId;
-        hotelName = within[0]!.hotelId;
+        // A refundable rate can be cancelled if a later leg fails, so it wins over a cheaper non-refundable one.
+        const pool = within.some((c) => c.refundable) ? within.filter((c) => c.refundable) : within;
+        offerId = pool[0]!.offerId;
+        hotelName = pool[0]!.hotelId;
       }
 
       const prebook = await this.prebook(offerId!);
