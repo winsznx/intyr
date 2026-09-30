@@ -7,6 +7,7 @@ import { Button, ButtonLink, ErrorState, HashText, Notice, ReasonList, Skeleton,
 import { ApiError, api } from "../../lib/api";
 import { formatDateTime, formatMoney, relativeTime } from "../../lib/format";
 import { COMPONENT_TYPE } from "../../lib/labels";
+import { approvalState } from "../../lib/recovery";
 import type { Trip } from "../../lib/types";
 import { useResource } from "../../lib/use-resource";
 
@@ -75,7 +76,7 @@ export function ApprovePage() {
   const irreversibleTotal = irreversible.reduce((sum, c) => sum + (c.price?.amount_minor ?? 0), 0);
   const currency = t.total?.currency ?? "USD";
   const expires = t.deadline ? relativeTime(t.deadline) : null;
-  const pending = Boolean(t.approval?.required) && !["COMMITTED", "COMMITTING", "RECOVERED", "RECOVERY_FAILED", "CANCELLED"].includes(t.state);
+  const pending = approvalState(t) === "NEEDED";
 
   return (
     <>
@@ -101,7 +102,9 @@ export function ApprovePage() {
               </div>
             </>
           ) : (
-            <p className="muted">This trip does not need an approval right now. Go back to the trip to see its current state.</p>
+            <p className="muted">
+              {approvalState(t) === "GIVEN" ? "This manifest is already approved. Go back to the trip to commit it." : "Nothing to approve on this trip. Go back to the trip to see its current state."}
+            </p>
           )}
 
           <dl className="kv">

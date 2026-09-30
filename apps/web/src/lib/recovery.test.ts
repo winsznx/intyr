@@ -21,3 +21,21 @@ describe("recoverySentence", () => {
     expect(text).toBe("Flight failed at commit. Still booked: hotel.");
   });
 });
+
+import { approvalState } from "./recovery";
+
+describe("approvalState", () => {
+  const base: Trip = { trip_id: "trp_1", state: "PREPARED_WITH_WARNINGS", components: [], approval: { required: true } };
+
+  it("needs a decision while commit is blocked for approval", () => {
+    expect(approvalState({ ...base, next_actions: [{ action: "COMMIT", allowed: false, reason: "APPROVAL_REQUIRED" }, { action: "REQUEST_APPROVAL", allowed: true }] })).toBe("NEEDED");
+  });
+
+  it("treats an allowed commit on a trip that required approval as approved", () => {
+    expect(approvalState({ ...base, next_actions: [{ action: "COMMIT", allowed: true }] })).toBe("GIVEN");
+  });
+
+  it("reports no approval when none was ever required", () => {
+    expect(approvalState({ ...base, approval: undefined, next_actions: [{ action: "COMMIT", allowed: true }] })).toBe("NONE");
+  });
+});

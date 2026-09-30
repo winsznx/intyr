@@ -75,7 +75,7 @@ Today every sandbox manifest verifies as `PROOF_PARTIAL`, "Signature valid, not 
 ## Limits of this release
 
 - Suppliers are Duffel and LiteAPI in test mode, plus Intyr's seeded simulator. No real travel is booked.
-- Real Duffel and LiteAPI test offers can be prepared and revalidated. Their readiness score is below the commit threshold, so commit does not run on them without a person's decision.
+- Real Duffel and LiteAPI test offers score below the readiness bar, so a person approves them in the session before Intyr commits (policy `sandbox-supplier-v1`). They are supplier test orders, not real travel, and a commit can take about a minute because both test systems are slow.
 - No bond, insurance or protection covers any trip (`assurance.mode` is `NONE`).
 - Approvals exist only inside the anonymous sandbox session. There are no organization accounts, API keys or roles in this release.
 

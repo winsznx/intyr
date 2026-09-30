@@ -25,3 +25,19 @@ export function recoverySentence(trip: Trip): string {
   return parts.join(" ");
 }
 
+
+export type ApprovalState = "NEEDED" | "GIVEN" | "NONE";
+
+/**
+ * The trip document keeps approval_required after a person approves, so the state comes from next_actions:
+ * approval is needed while COMMIT is blocked for APPROVAL_REQUIRED or a REQUEST_APPROVAL action is open.
+ */
+export function approvalState(trip: Trip): ApprovalState {
+  const actions = trip.next_actions ?? [];
+  const commit = actions.find((a) => a.action === "COMMIT");
+  const requested = actions.some((a) => a.action === "REQUEST_APPROVAL" && a.allowed);
+  if (requested || (commit && !commit.allowed && commit.reason === "APPROVAL_REQUIRED")) return "NEEDED";
+  if (trip.state === "MANUAL_REVIEW" && !commit?.allowed) return "NEEDED";
+  if (trip.approval?.required && commit?.allowed) return "GIVEN";
+  return "NONE";
+}

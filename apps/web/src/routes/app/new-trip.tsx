@@ -72,18 +72,18 @@ const INITIAL: Fields = {
   tripRef: "",
   flight: true,
   origin: "LHR",
-  destination: "LIS",
+  destination: "JFK",
   departDate: isoDate(21),
   passengers: 1,
   hold: false,
   hotel: true,
-  city: "Lisbon",
+  city: "New York",
   checkIn: isoDate(21),
-  checkOut: isoDate(24),
+  checkOut: isoDate(23),
   guests: 1,
   ground: false,
-  from: "LIS airport",
-  to: "Lisbon Alfama",
+  from: "JFK",
+  to: "Midtown Manhattan",
   pickupAt: `${isoDate(21)}T14:30`,
   budget: "2500",
   currency: "EUR",
@@ -202,8 +202,8 @@ export function NewTripPage() {
           <>
             <Notice kind="info" title="Supplier test mode.">
               Flights come from Duffel in test mode and hotels from LiteAPI's sandbox, priced in EUR. Ground transfers use a simulator, because no ground
-              supplier offers a sandbox without a contract. You can prepare and revalidate these offers. Their readiness is below the commit threshold in
-              this release, so Intyr refuses to commit them and says why. The failure scenarios on the demo page run on the simulator.
+              supplier offers a sandbox without a contract. Real test offers score below the readiness bar, so you approve them before Intyr commits, and
+              a commit can take a minute because supplier test systems are slow. The failure scenarios on the demo page run on the simulator.
             </Notice>
             {show("components") ? <p className="field-error">{errors.components}</p> : null}
 

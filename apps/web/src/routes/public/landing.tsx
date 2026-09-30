@@ -102,7 +102,8 @@ function Hero({ prices }: { prices: LivePrices | undefined }) {
           </h1>
           <p className="body-l lp-hero-sub">
             Intyr prepares each flight, hotel and transfer an AI agent wants, checks it before money moves, commits only inside the limits you set and
-            runs the recovery you agreed to. Agents pay per action in USDC on Algorand through x402.
+            runs the recovery you agreed to. When a leg cannot be undone, Intyr says so and shows what is still booked. Agents pay per action in USDC on
+            Algorand through x402.
           </p>
           <div className="lp-hero-actions">
             <ButtonLink to="/app/demo" size="lg">
@@ -349,7 +350,7 @@ function Pricing({ prices }: { prices: Resource<LivePrices> }) {
 const LIMITS = [
   {
     lead: "Test-mode and simulated suppliers",
-    text: "The demo failures run on a seeded simulator. Real Duffel and LiteAPI test-mode offers can be prepared and revalidated, and their readiness is below the commit threshold, so Intyr refuses to commit them in this release.",
+    text: "The demo failures run on a seeded simulator. Real Duffel and LiteAPI test offers score below the readiness bar, so a person approves them before Intyr commits. They are supplier test orders, not real travel.",
   },
   {
     lead: "No actual travel is booked",

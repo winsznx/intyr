@@ -21,7 +21,7 @@ import {
 import { api } from "../../lib/api";
 import { algoExplorerTx, formatDateTime, formatMoney } from "../../lib/format";
 import { COMPONENT_TYPE, UNKNOWN_COPY, describeReason, tripState } from "../../lib/labels";
-import { componentNames as names, recoverySentence, sentenceStart } from "../../lib/recovery";
+import { approvalState, componentNames as names, recoverySentence, sentenceStart } from "../../lib/recovery";
 import type { NextAction, Trip } from "../../lib/types";
 import { useResource } from "../../lib/use-resource";
 
@@ -36,7 +36,11 @@ type ActionName = "REVALIDATE" | "COMMIT" | "RECOVER";
 
 export function TripPage() {
   const { tripId = "" } = useParams();
-  const trip = useResource(`trip:${tripId}`, (signal) => api.getTrip(tripId, signal), { pollMs: 2000, shouldPoll: isRunning });
+  const inFlight = useRef(false);
+  const trip = useResource(`trip:${tripId}`, (signal) => api.getTrip(tripId, signal), {
+    pollMs: 2000,
+    shouldPoll: (data) => inFlight.current || isRunning(data),
+  });
   const [busy, setBusy] = useState<ActionName | null>(null);
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null);
   const confirmRef = useRef<HTMLDialogElement>(null);
@@ -45,6 +49,8 @@ export function TripPage() {
     if (!trip.data) return;
     setBusy(action);
     setOutcome(null);
+    inFlight.current = true;
+    trip.reload();
     try {
       const response =
         action === "REVALIDATE"
@@ -62,6 +68,7 @@ export function TripPage() {
     } catch (error) {
       setOutcome({ ok: false, action, error: error instanceof Error ? error : new Error(String(error)) });
     } finally {
+      inFlight.current = false;
       setBusy(null);
       trip.reload();
     }
@@ -206,6 +213,7 @@ function VerdictStrip({
   const failedLeg = trip.components.find((c) => c.state === "COMMIT_FAILED" || c.state === "UNAVAILABLE");
   const stillBooked = trip.components.filter((c) => c.state === "CONFIRMED");
   const strong = STRONG[trip.state];
+  const approval = approvalState(trip);
 
   let headline: ReactNode = state.label;
   let explain: ReactNode = null;
@@ -228,6 +236,12 @@ function VerdictStrip({
       if (refused && !commit?.allowed) {
         headline = "Intyr will not commit this trip";
         explain = `Intyr did not commit because ${describeReason(refused.reason_codes?.[0] ?? commit?.reason ?? "POLICY_DENIED").replace(/\.$/, "").replace(/^./, (c) => c.toLowerCase())}. Nothing was booked. Prepare a different trip or change its limits.`;
+      } else if (approval === "NEEDED") {
+        headline = "Needs your decision";
+        explain = `${describeReason(review?.reason_codes?.[0] ?? "APPROVAL_REQUIRED")} A person in this session has to approve the manifest before Intyr commits.`;
+      } else if (approval === "GIVEN") {
+        headline = "Approved, ready to commit";
+        explain = `A person in this session approved this manifest. Committing books the legs in the order below, and each one is read back before it counts. Plan ${validUntil}.`;
       } else if (trip.state === "PREPARED_WITH_WARNINGS") {
         explain = commit?.reason ? describeReason(commit.reason) : "Review the warnings below before committing.";
       } else if (trip.state === "READY_TO_COMMIT") {
@@ -238,7 +252,7 @@ function VerdictStrip({
       break;
     case "COMMITTING":
       headline = `Committing ${committed} of ${trip.components.length} components`;
-      explain = "You can leave this page. The commit continues on the server.";
+      explain = `You can leave this page. The commit continues on the server.${trip.components.some((c) => c.leg_class === "SUPPLIER_SANDBOX") ? " Supplier test systems can take a minute or more to confirm." : ""}`;
       break;
     case "COMMIT_STATUS_UNKNOWN":
       explain = (
@@ -298,12 +312,12 @@ function VerdictStrip({
         {explain ? <p className="verdict-explain">{explain}</p> : null}
       </div>
       <div className="verdict-actions">
-        {!blocked && (trip.approval?.required || trip.state === "MANUAL_REVIEW") && !state.terminal ? (
+        {!blocked && approval === "NEEDED" && !state.terminal ? (
           <ButtonLink to={`/app/trips/${trip.trip_id}/approve`} variant={strong ? "dark" : "primary"}>
             Review
           </ButtonLink>
         ) : null}
-        {!blocked && commit && !trip.approval?.required && !(refused && !commit.allowed) ? (
+        {!blocked && commit && approval !== "NEEDED" && !(refused && !commit.allowed) ? (
           <Button onClick={onCommit} disabled={!commit.allowed} loading={busy === "COMMIT"} title={commit.reason ? describeReason(commit.reason) : undefined}>
             Commit trip
           </Button>
