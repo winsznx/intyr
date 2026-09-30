@@ -33,9 +33,12 @@ export interface PaidRoute {
   amountAtomic: string;
   /** Commit-like routes start supplier work only after our own chain read matches the session. */
   requireChainConfirmation: boolean;
+  /** Set when the route has no implementation. It answers this before any 402, so nobody is offered a payment for it. */
+  unavailable?: HandlerResult;
   /**
-   * Runs before any charge. A REFUSE or UNKNOWN verdict here costs the caller nothing.
-   * Return null to continue to payment.
+   * Runs on a paid request before it is settled, so a REFUSE or UNKNOWN verdict costs the caller nothing. An unpaid
+   * request always gets the 402 first, because payment tooling probes routes with empty bodies and a 4xx there fails it.
+   * Return null to continue to settlement.
    */
   precheck?: (body: unknown) => Promise<HandlerResult | null>;
   /** Runs once per settled payment. Must be idempotent on `operationId`. */
@@ -76,6 +79,9 @@ export interface LadderDeps {
   confirmWaitMs?: number;
   sleep?: (ms: number) => Promise<void>;
 }
+
+/** A pending operation is left alone this long. Its first invocation may still be running, and a real-supplier commit takes close to a minute. */
+const OPERATION_LEASE_MS = 10 * 60_000;
 
 const PAYMENT_HEADERS = ["payment-signature", "x-payment"] as const;
 
@@ -173,9 +179,9 @@ export function createLadder(deps: LadderDeps) {
     const sandboxSessionId = getCookie(c, "intyr_sbx");
     const { created, operation } = await createOperation(deps.db, session.id, route.key, at);
     if (!created && operation.status !== "PENDING") return replayOperation(c, session, operation, settlementHeaders);
-    if (!created && operation.status === "PENDING" && Date.parse(at) - Date.parse(operation.updated_at) < 30_000) {
+    if (!created && operation.status === "PENDING" && Date.parse(at) - Date.parse(operation.updated_at) < OPERATION_LEASE_MS) {
       return c.json(
-        envelope(session, deps.net, { operation_id: operation.id, status: "PROCESSING", poll_url: `${new URL(c.req.url).origin}${routePrefix(deps.net.name)}/operations/${operation.id}` }),
+        envelope(session, deps.net, { operation_id: operation.id, status: "PROCESSING", message: "This payment's operation is still running. Do not pay again; poll this URL.", poll_url: `${new URL(c.req.url).origin}${routePrefix(deps.net.name)}/operations/${operation.id}` }),
         202,
       );
     }
@@ -219,26 +225,18 @@ export function createLadder(deps: LadderDeps) {
 
   return async function handle(c: Context, route: PaidRoute): Promise<Response> {
     const origin = new URL(c.req.url).origin;
+    if (route.unavailable) return c.json(envelope(null, deps.net, { ...route.unavailable.body, charged: false }), route.unavailable.status as 503);
     const read = await readBodyWithLimit(c);
     if (!read.ok) return read.response;
     const rawBody = read.raw;
-    let body: unknown;
+    let body: unknown = {};
+    let bodyHash = "";
+    let bodyError: string | null = null;
     try {
       body = rawBody.length === 0 ? {} : JSON.parse(rawBody);
-    } catch {
-      return c.json({ error: "INVALID_REQUEST", message: "Body must be JSON." }, 400);
-    }
-    let bodyHash: string;
-    try {
       bodyHash = await hashValue(canonicalize(body));
     } catch {
-      return c.json({ error: "INVALID_REQUEST", message: "Body is not canonicalizable JSON." }, 400);
-    }
-
-    // Gate before charge: a foreseeable refusal costs nothing.
-    if (route.precheck) {
-      const refused = await route.precheck(body);
-      if (refused) return c.json(envelope(null, deps.net, { ...refused.body, charged: false }), refused.status as 400);
+      bodyError = "Body must be JSON.";
     }
 
     const header = paymentHeader(c);
@@ -255,11 +253,13 @@ export function createLadder(deps: LadderDeps) {
       const result = await deps.httpServer.processHTTPRequest(context);
       if (result.type === "payment-error") {
         for (const [k, v] of Object.entries(result.response.headers)) c.header(k, v);
-        c.header("x-intyr-body-hash", bodyHash);
+        if (bodyHash) c.header("x-intyr-body-hash", bodyHash);
         return result.response.isHtml ? c.html(result.response.body as string, result.response.status as 402) : c.json((result.response.body ?? {}) as object, result.response.status as 402);
       }
       return c.json({ error: "INTERNAL_ERROR", message: "route is not payment protected" }, 500);
     }
+
+    if (bodyError) return c.json({ error: "INVALID_REQUEST", message: bodyError }, 400);
 
     // 1. Decode and record the proof before anyone else sees it.
     let decoded: DecodedPayment;
@@ -272,6 +272,11 @@ export function createLadder(deps: LadderDeps) {
     }
     if (decoded.receiver !== deps.payTo || decoded.assetId !== deps.net.usdcAssetId || decoded.amount !== route.amountAtomic) {
       return c.json(envelope(null, deps.net, { error: "PAYMENT_INVALID", message: "payment does not match the published requirements for this route" }), 402);
+    }
+    // Gate before charge. A proof already on file is a replay and gets its stored operation, so only a new proof is checked.
+    if (route.precheck && !(await getSessionByTxid(deps.db, decoded.txid))) {
+      const refused = await route.precheck(body);
+      if (refused) return c.json(envelope(null, deps.net, { ...refused.body, charged: false }), refused.status as 400);
     }
     const payerClass: PayerClass = deps.teamWallets.includes(decoded.sender) ? "INTERNAL_VALIDATION" : "EXTERNAL_ANON";
     const inserted = await insertSession(deps.db, {

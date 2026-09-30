@@ -37,7 +37,8 @@ export function buildPaidRoutes(domain: DomainHandlers, prefix: string): PaidRou
       key: `POST ${prefix}${p.path.slice("/v1".length)}`,
       amountAtomic: p.amountAtomic,
       requireChainConfirmation: p.requires_chain_confirmation,
-      precheck: d?.precheck ?? (d ? undefined : async () => notAvailable(p.key)),
+      ...(d ? {} : { unavailable: notAvailable(p.key) }),
+      ...(d?.precheck ? { precheck: d.precheck } : {}),
       handler: d?.handler ?? (async () => notAvailable(p.key)),
     };
   });

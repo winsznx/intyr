@@ -163,14 +163,56 @@ describe("payment ladder", () => {
     expect(h.handlerCalls.n).toBe(1);
   });
 
-  it("refuses before charging when the gate says REFUSE", async () => {
-    const res = await h.app.request(URL_ + "/sandbox/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refuse: true }) });
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as Record<string, unknown>;
+  it("answers an unpaid request with the 402 even when its body would be refused, then refuses the paid retry before settling", async () => {
+    const unpaid = await h.app.request(URL_ + "/sandbox/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refuse: true }) });
+    expect(unpaid.status).toBe(402);
+    expect(unpaid.headers.get("payment-required")).not.toBeNull();
+
+    const refused = await pay("/sandbox/v1/trips/commit", { refuse: true });
+    expect(refused.res.status).toBe(422);
+    const body = (await refused.res.json()) as Record<string, unknown>;
     expect(body.outcome).toBe("REFUSE");
     expect(body.charged).toBe(false);
-    expect(res.headers.get("payment-required")).toBeNull();
     expect(h.fac.calls.verify + h.fac.calls.settle).toBe(0);
+    const sessions = await h.db.prepare("SELECT COUNT(*) AS n FROM payment_sessions").first<{ n: number }>();
+    expect(sessions?.n).toBe(0);
+  });
+
+  it("answers every paid route with a 402 to an empty body, which is what payment tooling sends", async () => {
+    // The harness implements these three. A route with no implementation answers 503 instead, so nobody is offered a payment for it.
+    for (const path of ["check", "commit", "recover"]) {
+      const res = await h.app.request(`${URL_}/sandbox/v1/trips/${path}`, { method: "POST" });
+      expect(res.status, path).toBe(402);
+    }
+    expect((await h.app.request(`${URL_}/sandbox/v1/trips/prepare`, { method: "POST" })).status).toBe(503);
+    const garbled = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json" }, body: "{not json" });
+    expect(garbled.status).toBe(402);
+  });
+
+  it("rejects a paid request whose body is not JSON before reading the proof", async () => {
+    const { requirements } = await challenge(h, "/sandbox/v1/trips/check", {});
+    const built = buildPaymentHeader({ payer: newPayer(), requirements, resourceUrl: URL_ + "/sandbox/v1/trips/check" });
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: "{not json" });
+    expect(res.status).toBe(400);
+    expect(h.fac.calls.settle).toBe(0);
+  });
+
+  it("does not re-run a pending operation inside its lease, and a replay skips the precheck", async () => {
+    const first = await pay("/sandbox/v1/trips/commit", { trip_id: "trp_1" });
+    expect(first.res.status).toBe(200);
+    const session = await h.db.prepare("SELECT id FROM payment_sessions").first<{ id: string }>();
+    const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+    const replay = () => h.app.request(URL_ + "/sandbox/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json", "payment-signature": first.built.header }, body: JSON.stringify({ trip_id: "trp_1" }) });
+
+    await h.db.prepare("UPDATE operations SET status = 'PENDING', result_json = NULL, http_status = NULL, updated_at = ?1 WHERE session_id = ?2").bind(ago(31_000), session!.id).run();
+    const inside = await replay();
+    expect(inside.status).toBe(202);
+    expect(await inside.json()).toMatchObject({ status: "PROCESSING", poll_url: expect.stringContaining("/sandbox/v1/operations/") });
+    expect(h.handlerCalls.n).toBe(1);
+
+    await h.db.prepare("UPDATE operations SET updated_at = ?1 WHERE session_id = ?2").bind(ago(11 * 60_000), session!.id).run();
+    expect((await replay()).status).toBe(200);
+    expect(h.handlerCalls.n).toBe(2);
   });
 
   it("rejects a payment whose amount does not match the route before contacting the facilitator", async () => {
