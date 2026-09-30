@@ -10,7 +10,7 @@ import {
   merkleRoot,
   newId,
   parseWith,
-  PUBLIC_DEFAULT_POLICY,
+  basePolicyFor,
   decidePrepare,
   effectivePolicy,
   legFromPrepared,
@@ -254,11 +254,12 @@ export async function buildManifest(
   input: { tripId: string; legs: PreparedLeg[]; intent: PublicTripIntent; intentHash: string; supersedes?: string; inbound: ReturnType<typeof paymentRefs>; decisionHashes: string[]; prevDecisionHash?: string },
 ): Promise<ManifestBuild> {
   const now = deps.now();
-  const policy = effectivePolicy(PUBLIC_DEFAULT_POLICY, input.intent.limits, input.intent.budget_total_minor);
+  const legs = input.legs.map((l) => legFromPrepared(l));
+  const policy = effectivePolicy(basePolicyFor(deps.environment, legs), input.intent.limits, input.intent.budget_total_minor);
   const { assessment, decision } = await decidePrepare({
     trip_id: input.tripId,
     currency: input.intent.currency,
-    legs: input.legs.map((l) => legFromPrepared(l)),
+    legs,
     policy,
     now,
     ...(input.prevDecisionHash ? { prev_decision_hash: input.prevDecisionHash } : {}),

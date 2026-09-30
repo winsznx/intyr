@@ -82,7 +82,7 @@ async function gateInput(deps: ServiceDeps, row: TripRow, request: CommitRequest
         : null,
     request,
     approval: approval && approval.decision === "APPROVE" ? { manifest_hash: approval.manifest_hash } : null,
-    policy_version: PUBLIC_DEFAULT_POLICY.policy_version,
+    policy_version: prepared?.policy_version ?? PUBLIC_DEFAULT_POLICY.policy_version,
     now: deps.now(),
   };
 }

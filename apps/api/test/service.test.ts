@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MemorySimulatorStore, createAdapters } from "@intyr/adapters";
-import { generateSigningKey, publishedKey, verifyManifestDocument, type CommitManifest, type Signed, type TransactionManifest } from "@intyr/core";
+import { MemorySimulatorStore, createAdapters, type IntyrAdapter } from "@intyr/adapters";
+import { generateSigningKey, publishedKey, verifyManifestDocument, type CommitManifest, type GateDecision, type Signed, type TransactionManifest } from "@intyr/core";
 import type { PaymentSession } from "../src/payments/sessions";
 import type { PaidContext } from "../src/payments/ladder";
 import { TripStore } from "../src/domain/store";
@@ -223,6 +223,63 @@ describe("failure handling", () => {
     expect(pre?.body.outcome).toBe("NO_ACTION");
     expect(pre?.body.supplier_calls_made).toBe(0);
     expect(pre?.body.charged).toBe(false);
+  });
+});
+
+describe("sandbox supplier policy", () => {
+  /** The simulator, presented as a supplier sandbox, so the trip carries SUPPLIER_SANDBOX evidence. */
+  function asSupplierSandbox(adapter: IntyrAdapter): IntyrAdapter {
+    return new Proxy(adapter, {
+      get(target, prop) {
+        if (prop === "prepare") {
+          return async (req: Parameters<IntyrAdapter["prepare"]>[0]) => {
+            const res = await target.prepare(req);
+            return res.ok ? { ...res, leg: { ...res.leg, evidence_grade: "SUPPLIER_SANDBOX" as const, leg_class: "SUPPLIER_SANDBOX" as const } } : res;
+          };
+        }
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }
+
+  const nonRefundableFlight = () => baseIntent([{ component_index: 1, fault: "NON_REFUNDABLE" }]);
+
+  it("sends a below-threshold trip of supplier sandbox legs to approval, and refuses the same trip when simulated", async () => {
+    const simulated = await setup();
+    const refused = await prepare(simulated, nonRefundableFlight());
+    const refusedDecision = ((await simulated.store.listDecisions(refused.tripId!)) as GateDecision[]).find((d) => d.gate === "PREPARE");
+    expect(refusedDecision).toMatchObject({ outcome: "REFUSE", reason_codes: ["READINESS_BELOW_THRESHOLD"], policy_version: "public-default-v1" });
+
+    const s = await setup();
+    const real = s.deps.adapters;
+    s.deps.adapters = { get: (id) => real.get(id) && asSupplierSandbox(real.get(id)!), all: () => real.all().map(asSupplierSandbox), forType: (t, o) => { const a = real.forType(t, o); return a && asSupplierSandbox(a); } };
+    const prep = await prepare(s, nonRefundableFlight());
+    const decisions = (await s.store.listDecisions(prep.tripId!)) as GateDecision[];
+    expect(decisions.find((d) => d.gate === "PREPARE")).toMatchObject({ outcome: "MANUAL_REVIEW", policy_version: "sandbox-supplier-v1", required_role: "SESSION_APPROVER" });
+
+    const body = commitBody(prep.tripId!, prep);
+    const before = await precheckCommit(body, s.deps);
+    expect(before?.body.outcome).toBe("MANUAL_REVIEW");
+
+    await s.store.putApproval({ trip_id: prep.tripId!, manifest_hash: String(prep.body.manifest_hash), decision: "APPROVE", actor: "session:test", now: new Date().toISOString() });
+    expect(await precheckCommit(body, s.deps)).toBeNull();
+    const done = await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
+    expect(done.body.outcome).toBe("ACT");
+    const commitGate = ((await s.store.listDecisions(prep.tripId!)) as GateDecision[]).filter((d) => d.gate === "COMMIT").pop();
+    expect(commitGate?.policy_version).toBe("sandbox-supplier-v1");
+  });
+
+  it("never applies it on Mainnet", async () => {
+    const s = await setup();
+    s.deps.environment = "MAINNET";
+    s.deps.allowScenario = false;
+    const real = s.deps.adapters;
+    s.deps.adapters = { get: (id) => real.get(id) && asSupplierSandbox(real.get(id)!), all: () => real.all().map(asSupplierSandbox), forType: (t, o) => { const a = real.forType(t, o); return a && asSupplierSandbox(a); } };
+    const intent = { ...baseIntent(), scenario: undefined };
+    const prep = await prepare(s, intent);
+    const decision = ((await s.store.listDecisions(prep.tripId!)) as GateDecision[]).find((d) => d.gate === "PREPARE");
+    expect(decision?.policy_version).toBe("public-default-v1");
   });
 });
 
