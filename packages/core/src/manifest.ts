@@ -1,7 +1,7 @@
 import { canonicalize } from "./canonical";
 import { hashValue, sha256Hex } from "./hash";
-import { signDocument, verifyDocument, type PublishedKey, type Signed, type SigningKey } from "./sign";
-import type { CommitManifest, ManifestComponent, ManifestStatusRecord, TransactionManifest } from "./types";
+import { signDocument, verifyDocument, type PublishedKey, type Signed, type SignatureContext, type SigningKey } from "./sign";
+import type { CommitManifest, CommitPlan, ManifestComponent, ManifestStatusRecord, TransactionManifest } from "./types";
 import type { EvidenceBanner, ManifestStatus, ProofState } from "./vocab";
 
 const EMPTY_ROOT_INPUT = "intyr/empty-root";
@@ -110,22 +110,32 @@ export type ManifestCheck =
         | "SIGNATURE_INVALID"
         | "UNKNOWN_KEY"
         | "KEY_REVOKED"
+        | "UNKNOWN_SCHEMA"
         | "COMPONENT_ROOT_MISMATCH"
         | "DECISIONS_ROOT_MISMATCH";
     };
 
+/** Every document Intyr signs and a verifier can be handed. */
+export type SignedRecord = CommitPlan | CommitManifest | TransactionManifest;
+
+const CONTEXT_OF: Record<SignedRecord["schema_version"], SignatureContext> = {
+  "commit-plan/1": "intyr/plan/v1",
+  "commit-manifest/1": "intyr/manifest/v1",
+  "transaction-manifest/1": "intyr/transaction/v1",
+};
+
 /**
- * Offline integrity check: payload hash, signature, and recomputed component
- * and decisions roots. Chain linkage is checked separately against a public indexer.
+ * Offline integrity check: payload hash, signature in the context of the
+ * document's schema, and recomputed component and decisions roots for
+ * manifests. Chain linkage is checked separately against a public indexer.
  */
-export async function verifyManifestDocument<T extends CommitManifest | TransactionManifest>(
-  doc: Signed<T>,
-  keys: PublishedKey[],
-): Promise<ManifestCheck> {
-  const payload: CommitManifest | TransactionManifest = doc.payload;
-  const context = payload.schema_version === "commit-manifest/1" ? "intyr/manifest/v1" : "intyr/transaction/v1";
+export async function verifyManifestDocument<T extends SignedRecord>(doc: Signed<T>, keys: PublishedKey[]): Promise<ManifestCheck> {
+  const payload: SignedRecord = doc.payload;
+  const context = Object.hasOwn(CONTEXT_OF, payload.schema_version) ? CONTEXT_OF[payload.schema_version] : undefined;
+  if (!context) return { ok: false, reason: "UNKNOWN_SCHEMA" };
   const check = await verifyDocument(doc, context, keys);
   if (!check.ok) return check;
+  if (payload.schema_version === "commit-plan/1") return { ok: true };
   if ((await componentRoot(payload.components)) !== payload.component_root) {
     return { ok: false, reason: "COMPONENT_ROOT_MISMATCH" };
   }
@@ -141,7 +151,10 @@ export async function verifyManifestDocument<T extends CommitManifest | Transact
 /** Proof state a failed integrity check reports. A root that does not match its leaves is a hash mismatch, not a bad signature. */
 export function integrityProofState(check: ManifestCheck): Extract<ProofState, "HASH_MISMATCH" | "SIGNATURE_INVALID"> | null {
   if (check.ok) return null;
-  return check.reason === "SIGNATURE_INVALID" || check.reason === "UNKNOWN_KEY" || check.reason === "KEY_REVOKED"
+  return check.reason === "SIGNATURE_INVALID" ||
+    check.reason === "UNKNOWN_KEY" ||
+    check.reason === "KEY_REVOKED" ||
+    check.reason === "UNKNOWN_SCHEMA"
     ? "SIGNATURE_INVALID"
     : "HASH_MISMATCH";
 }

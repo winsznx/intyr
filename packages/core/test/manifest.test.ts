@@ -14,7 +14,8 @@ import {
   type CommitManifestInput,
 } from "../src/manifest";
 import { generateSigningKey, publishedKey, signDocument } from "../src/sign";
-import { HASH_A, HASH_B, inMinutes, manifestComponent, NOW, TRIP_ID } from "./fixtures";
+import { planTrip } from "../src/planner";
+import { checkRequest, HASH_A, HASH_B, inMinutes, manifestComponent, NOW, TRIP_ID, wireLeg } from "./fixtures";
 
 const hex = (hash: string) => hash.slice("sha256:".length);
 
@@ -205,6 +206,35 @@ describe("transaction manifest decisions root", () => {
 
     // #then the recomputed decisions root exposes the edit, reported as a hash mismatch
     expect([check, integrityProofState(check)]).toEqual([{ ok: false, reason: "DECISIONS_ROOT_MISMATCH" }, "HASH_MISMATCH"]);
+  });
+});
+
+describe("verifyManifestDocument on other signed records", () => {
+  it("verifies a signed commit plan in the plan context", async () => {
+    const { key, published } = await keys();
+    const plan = await planTrip(checkRequest([wireLeg("hotel")]), { now: NOW, environment: "TESTNET" });
+    expect(await verifyManifestDocument(await signDocument(key, "intyr/plan/v1", plan), published)).toEqual({ ok: true });
+  });
+
+  it("does not verify a commit plan signed in the manifest context", async () => {
+    const { key, published } = await keys();
+    const plan = await planTrip(checkRequest([wireLeg("hotel")]), { now: NOW, environment: "TESTNET" });
+    expect(await verifyManifestDocument(await signDocument(key, "intyr/manifest/v1", plan), published)).toEqual({
+      ok: false,
+      reason: "SIGNATURE_INVALID",
+    });
+  });
+
+  it("refuses a document whose schema Intyr never signs", async () => {
+    // #given a signed document with a made-up schema version
+    const { key, published } = await keys();
+    const odd = await signDocument(key, "intyr/manifest/v1", { schema_version: "made-up/1" });
+
+    // #when it is verified as a record
+    const check = await verifyManifestDocument(odd as unknown as Parameters<typeof verifyManifestDocument>[0], published);
+
+    // #then it is reported as not a signed Intyr record
+    expect([check, integrityProofState(check)]).toEqual([{ ok: false, reason: "UNKNOWN_SCHEMA" }, "SIGNATURE_INVALID"]);
   });
 });
 
