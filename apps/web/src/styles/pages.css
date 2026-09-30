@@ -1,0 +1,15 @@
+/* Shared page-level styles. Page-specific blocks are appended below, one section per route. */
+
+.reason-list {
+  display: grid;
+  gap: 6px;
+}
+
+.reason-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 14px;
+}
