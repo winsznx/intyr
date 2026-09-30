@@ -3,14 +3,14 @@ import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { networkConfig } from "../src/config";
 import { getRefundBySession, openFeeRefund, summarize } from "../src/payments/refunds";
 import type { NetworkDeps } from "../src/app";
-import { createLadder } from "../src/payments/ladder";
+import { createLadder, reconcileSession } from "../src/payments/ladder";
 import { createX402Server } from "../src/server";
 import { createApp } from "../src/app";
 import type { DomainHandlers } from "../src/domain";
 import type { Env } from "../src/env";
 import { createTestD1 } from "./support/d1";
 import { buildPaymentHeader, fakeFacilitator, newPayer, type FakeFacilitator } from "./support/payments";
-import { getSessionByTxid } from "../src/payments/sessions";
+import { getSessionByTxid, type PaymentSession } from "../src/payments/sessions";
 
 const PAY_TO = newPayer().addr;
 const URL_ = "https://intyr.test";
@@ -195,6 +195,31 @@ describe("payment ladder", () => {
 
     const mine = await pay("/sandbox/v1/trips/commit", { trip_id: "trp_1" }, { payer: owner });
     expect(mine.res.status).toBe(200);
+  });
+
+  it("confirms a settled payment from the ledger, and stops counting one the ledger never shows", async () => {
+    const { res } = await pay("/sandbox/v1/trips/check", { legs: [1] });
+    expect(res.status).toBe(200);
+    const settled = await h.db.prepare("SELECT * FROM payment_sessions").first<PaymentSession>();
+    expect(settled?.state).toBe("SETTLED");
+
+    const net = networkConfig("testnet");
+    const ledger = (status: "confirmed" | "absent"): typeof fetch => async (input) => {
+      const url = String(input);
+      if (status === "confirmed" && url.includes("/v2/transactions/") && !url.includes("pending")) {
+        return new Response(JSON.stringify({ transaction: { "confirmed-round": 1500, sender: settled!.payer, "asset-transfer-transaction": { amount: 100000, "asset-id": 10458941, receiver: PAY_TO } } }), { status: 200 });
+      }
+      if (url.endsWith("/v2/status")) return new Response(JSON.stringify({ "last-round": 99_999 }), { status: 200 });
+      return new Response("{}", { status: 404 });
+    };
+
+    expect(await reconcileSession({ db: h.db, net, fetchFn: ledger("absent") }, { ...settled!, last_valid: 10 })).toBe("PENDING");
+    expect((await h.db.prepare("SELECT state FROM payment_sessions").first<{ state: string }>())?.state).toBe("UNKNOWN");
+    await h.db.prepare("UPDATE payment_sessions SET state = 'SETTLED'").run();
+
+    expect(await reconcileSession({ db: h.db, net, fetchFn: ledger("confirmed") }, settled!)).toBe("CONFIRMED");
+    const row = await h.db.prepare("SELECT state, confirmed_round FROM payment_sessions").first<{ state: string; confirmed_round: number }>();
+    expect(row).toEqual({ state: "CONFIRMED", confirmed_round: 1500 });
   });
 
   it("answers every paid route with a 402 to an empty body, which is what payment tooling sends", async () => {

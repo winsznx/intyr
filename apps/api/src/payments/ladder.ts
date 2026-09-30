@@ -430,6 +430,11 @@ export async function reconcileSession(
     await transition(deps.db, session.id, ["SETTLED"], "CONFIRMED", at, { confirmed_round: reading.round }, { via: "reconciler" });
     return "CONFIRMED";
   }
+  if (reading.status === "absent" && reading.currentRound > session.last_valid + 1 && session.state === "SETTLED") {
+    // The facilitator said settled, the window has closed and no node shows the transfer. Do not keep counting it.
+    await transition(deps.db, session.id, ["SETTLED"], "UNKNOWN", at, { last_error: "reported settled but the ledger does not show the transfer" }, { via: "reconciler" });
+    return "PENDING";
+  }
   if (reading.status === "absent" && reading.currentRound > session.last_valid + 1) {
     await transition(deps.db, session.id, ["UNKNOWN", "SETTLE_FAILED", "SETTLE_SUBMITTED", "PROOF_RECEIVED"], "EXPIRED_UNSETTLED", at, {
       last_error: "validity window passed without confirmation",

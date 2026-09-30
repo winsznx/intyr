@@ -81,7 +81,7 @@ export default {
     ctx.waitUntil(
       (async () => {
         const cutoff = new Date(Date.now() - 20_000).toISOString();
-        const stale = await listStaleSessions(env.DB, ["UNKNOWN", "SETTLE_SUBMITTED", "SETTLE_FAILED", "PROOF_RECEIVED"], cutoff);
+        const stale = await listStaleSessions(env.DB, ["UNKNOWN", "SETTLE_SUBMITTED", "SETTLE_FAILED", "PROOF_RECEIVED", "SETTLED"], cutoff);
         for (const session of stale) {
           const net = built.nets.find((n) => n.caip2 === session.network);
           if (net) await reconcileSession({ db: env.DB, net }, session);
