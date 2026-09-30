@@ -11,6 +11,7 @@ import { KEY_ID, KEY_VALID_FROM, buildServiceDeps } from "./domain/wire";
 import { publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type CommitManifest, type TransactionManifest } from "@intyr/core";
 import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
+import { checkAnchor } from "./anchor";
 
 export interface NetworkDeps {
   net: NetworkConfig;
@@ -66,6 +67,8 @@ function publishedKeys(env: Env): PublishedKey[] {
   if (!env.MANIFEST_SIGNING_JWK) return [];
   return [publishedKey(signingKeyFromJwkJson(KEY_ID, env.MANIFEST_SIGNING_JWK), KEY_VALID_FROM)];
 }
+
+const VERIFY_NOTE = "Integrity and timing only. This does not prove the supplier told the truth.";
 
 export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
   const app = new Hono<{ Bindings: Env }>();
@@ -200,13 +203,36 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
       }
       if (!signed || typeof signed !== "object") return c.json({ error: "INVALID_REQUEST", message: "Send {signed} or {manifest_id}." }, 422);
       const result = await verifyManifestDocument(signed as Signed<CommitManifest | TransactionManifest>, keys);
-      const proof_state = result.ok ? "PROOF_VERIFIED" : result.reason === "HASH_MISMATCH" ? "HASH_MISMATCH" : "SIGNATURE_INVALID";
-      return c.json({ proof_state, integrity: result.ok ? "VALID" : "INVALID", ...(result.ok ? {} : { reason: result.reason }), checked: ["payload_hash", "signature", "component_root"], keys: keys.map((k) => k.key_id), note: "Integrity and timing only. This does not prove the supplier told the truth." });
+      if (!result.ok) {
+        const proof_state = result.reason === "HASH_MISMATCH" ? "HASH_MISMATCH" : "SIGNATURE_INVALID";
+        return c.json({ proof_state, integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
+      }
+      const doc = signed as Signed<CommitManifest | TransactionManifest>;
+      const anchorRow = await store.getAnchor(doc.payload.manifest_id);
+      const anchor = anchorRow && anchorRow.network === n.net.name ? await checkAnchor(n.net, anchorRow.txid, doc.payload_hash) : ({ state: "ANCHOR_NOT_FOUND" } as const);
+      const proof_state = anchor.state === "ANCHOR_CONFIRMED" ? "PROOF_VERIFIED" : anchor.state === "HASH_MISMATCH" ? "HASH_MISMATCH" : "PROOF_PARTIAL";
+      return c.json({
+        proof_state,
+        integrity: "VALID",
+        anchor: { ...anchor, network: n.net.caip2, ...("txid" in anchor ? { explorer: n.net.explorerTx(anchor.txid) } : {}) },
+        checked: ["payload_hash", "signature", "component_root", "anchor_note"],
+        keys: keys.map((k) => k.key_id),
+        note: VERIFY_NOTE,
+      });
     });
     app.get(`${prefix}/manifests/:id`, async (c) => {
       const row = await store.getManifest(c.req.param("id"));
       if (!row || row.network !== n.net.name) return c.json({ error: "NOT_FOUND" }, 404);
-      return c.json({ manifest_id: row.id, kind: row.kind, status: row.status, hash: row.hash, expires_at: row.expires_at, signed: JSON.parse(row.signed_json) });
+      const anchor = await store.getAnchor(row.id);
+      return c.json({
+        manifest_id: row.id,
+        kind: row.kind,
+        status: row.status,
+        hash: row.hash,
+        expires_at: row.expires_at,
+        anchor: anchor && anchor.network === n.net.name ? { mode: anchor.mode, network: n.net.caip2, state: anchor.state, txid: anchor.txid, confirmed_round: anchor.round, ...(anchor.txid ? { explorer: n.net.explorerTx(anchor.txid) } : {}) } : null,
+        signed: JSON.parse(row.signed_json),
+      });
     });
     app.get(`${prefix}/operations/:id`, async (c) => {
       const op = await getOperation(db, c.req.param("id"));
