@@ -97,7 +97,7 @@ export function TripRails({
           const clocks = compact || !showClocks ? null : clockLine(c);
           const state = componentState(c.state);
           return (
-            <li key={c.component_id} className="rail-row" data-post={post} data-pre={pre} data-irreversible={c.irreversible || undefined}>
+            <li key={c.component_id} className="rail-row" data-role="rail" data-state={c.state} data-post={post} data-pre={pre} data-irreversible={c.irreversible || undefined}>
               <div className="rail-label">
                 {hasOrder ? (
                   <span className="rail-order mono" title="Commit order">
@@ -117,7 +117,7 @@ export function TripRails({
                 <span className="rail-bar" />
                 <span className="rail-node" />
               </div>
-              <div className="rail-boundary" aria-hidden />
+              <div className="rail-boundary" data-role="commit-boundary" aria-hidden />
               <div className="rail-track rail-post">
                 <span className="rail-bar" />
                 <span className="rail-end">

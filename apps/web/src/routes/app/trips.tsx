@@ -121,7 +121,7 @@ function QueueRow({ trip }: { trip: TripSummary }) {
   const deadline = trip.next_action?.deadline && !tripState(trip.state).terminal ? relativeTime(trip.next_action.deadline) : null;
   const urgent = urgency(trip) <= 1;
   return (
-    <li>
+    <li data-role="trip-row" data-state={trip.state}>
       <Link to={`/app/trips/${trip.trip_id}`} className="queue-row" data-urgent={urgent || undefined}>
         <span className="queue-state">
           <TripStateChip state={trip.state} />

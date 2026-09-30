@@ -33,46 +33,46 @@ export const UNKNOWN_COPY =
   "We have not confirmed whether the supplier completed this. Do not retry. Intyr is checking and will update this trip.";
 
 export const UNKNOWN_PAYMENT_COPY =
-  "The payment was submitted but its settlement is not confirmed yet. Do not pay again. Intyr is reading the chain and will update this page.";
+  "We have not confirmed whether this fee settled. Do not pay again. Intyr is checking the transaction and will update this trip.";
 
 export const TRIP_STATE: Record<TripState, StateLabel> = {
   DRAFT: { label: "Draft", tone: "outline" },
-  CHECKED: { label: "Plan checked", tone: "info", terminal: true },
+  CHECKED: { label: "Plan checked", tone: "outline", terminal: true },
   PREPARING: { label: "Preparing", tone: "running", running: true },
-  PREPARED: { label: "Prepared", tone: "outline" },
+  PREPARED: { label: "Prepared", tone: "info" },
   PREPARED_WITH_WARNINGS: { label: "Prepared with warnings", tone: "amber" },
   PREPARATION_FAILED: { label: "Preparation failed", tone: "danger", terminal: true },
-  REVALIDATING: { label: "Rechecking prices", tone: "running", running: true },
+  REVALIDATING: { label: "Revalidating", tone: "running", running: true },
   READY_TO_COMMIT: { label: "Ready to commit", tone: "info" },
   COMMITTING: { label: "Committing", tone: "running", running: true },
-  COMMIT_STATUS_UNKNOWN: { label: "Status unknown, checking", tone: "unknown", running: true },
-  COMMITTED_UNVERIFIED: { label: "Committed, verifying", tone: "running", running: true },
+  COMMIT_STATUS_UNKNOWN: { label: "Booking status unknown, checking supplier", tone: "unknown", running: true },
+  COMMITTED_UNVERIFIED: { label: "Committed, still checking", tone: "info", running: true },
   COMMITTED: { label: "Committed", tone: "success", terminal: true },
-  COMMIT_NOT_EXECUTED: { label: "Not committed", tone: "neutral", terminal: true },
+  COMMIT_NOT_EXECUTED: { label: "Not committed", tone: "outline", terminal: true },
   RECOVERING: { label: "Recovering", tone: "amber", running: true },
   RECOVERED: { label: "Recovered", tone: "success-outline", terminal: true },
   RECOVERY_FAILED: { label: "Recovery failed", tone: "danger", terminal: true },
-  MANUAL_REVIEW: { label: "Needs review", tone: "review" },
-  CANCELLED: { label: "Cancelled", tone: "neutral", terminal: true },
-  SERVICING: { label: "Servicing", tone: "amber", running: true },
+  MANUAL_REVIEW: { label: "Needs your decision", tone: "review" },
+  CANCELLED: { label: "Cancelled", tone: "outline", terminal: true },
+  SERVICING: { label: "Servicing", tone: "outline" },
 };
 
 export const COMPONENT_STATE: Record<ComponentState, StateLabel> = {
   REQUESTED: { label: "Requested", tone: "outline" },
-  PREPARING: { label: "Checking supplier", tone: "running", running: true },
-  PREPARED: { label: "Prepared", tone: "outline" },
-  PRICE_UNCERTAIN: { label: "Price may move", tone: "amber" },
-  UNAVAILABLE: { label: "Unavailable", tone: "danger", terminal: true },
-  EXPIRED: { label: "Expired", tone: "neutral", terminal: true },
+  PREPARING: { label: "Preparing", tone: "running", running: true },
+  PREPARED: { label: "Prepared", tone: "info" },
+  PRICE_UNCERTAIN: { label: "Price changed", tone: "amber" },
+  UNAVAILABLE: { label: "Unavailable", tone: "outline", terminal: true },
+  EXPIRED: { label: "Expired", tone: "amber", terminal: true },
   COMMIT_SUBMITTED: { label: "Booking sent", tone: "running", running: true },
-  COMMIT_RESPONDED: { label: "Supplier replied, confirming", tone: "running", running: true },
+  COMMIT_RESPONDED: { label: "Checking with supplier", tone: "running", running: true },
   CONFIRMED: { label: "Confirmed", tone: "success", terminal: true },
-  COMMIT_STATUS_UNKNOWN: { label: "Unknown, checking", tone: "unknown", running: true },
-  COMMIT_FAILED: { label: "Booking failed", tone: "danger", terminal: true },
-  CANCELLING: { label: "Cancelling", tone: "amber", running: true },
-  CANCELLED: { label: "Cancelled", tone: "neutral", terminal: true },
+  COMMIT_STATUS_UNKNOWN: { label: "Unknown", tone: "unknown", running: true },
+  COMMIT_FAILED: { label: "Commit failed", tone: "danger", terminal: true },
+  CANCELLING: { label: "Cancelling", tone: "running", running: true },
+  CANCELLED: { label: "Cancelled", tone: "outline", terminal: true },
   RECOVERY_PENDING: { label: "Recovery pending", tone: "amber" },
-  REPLACED: { label: "Replaced", tone: "neutral", terminal: true },
+  REPLACED: { label: "Replaced", tone: "outline", terminal: true },
 };
 
 export interface DecisionLabel {
@@ -82,8 +82,8 @@ export interface DecisionLabel {
 }
 
 export const DECISION: Record<DecisionOutcome, DecisionLabel> = {
-  ACT: { label: "ACT", tone: "success", meaning: "Preconditions held and the action was authorized." },
-  NO_ACTION: { label: "NO_ACTION", tone: "neutral", meaning: "Nothing needed doing, so nothing was done." },
+  ACT: { label: "ACT", tone: "info", meaning: "Authorized. Not done until a supplier read confirms it." },
+  NO_ACTION: { label: "NO_ACTION", tone: "outline", meaning: "Nothing needed doing, so nothing was done." },
   UNKNOWN: { label: "UNKNOWN", tone: "unknown", meaning: "The outcome could not be established yet. Nothing is retried until it is." },
   REFUSE: { label: "REFUSE", tone: "danger", meaning: "Intyr declined to act, and says why." },
   MANUAL_REVIEW: { label: "MANUAL_REVIEW", tone: "review", meaning: "A person has to decide before anything moves." },
@@ -92,15 +92,15 @@ export const DECISION: Record<DecisionOutcome, DecisionLabel> = {
 export const PAYMENT_STATE: Record<PaymentState, StateLabel> = {
   NONE: { label: "No payment", tone: "outline" },
   SPONSORED: { label: "Sandbox: payment sponsored, no USDC moved", tone: "outline" },
-  CHALLENGED: { label: "Payment requested", tone: "outline" },
+  CHALLENGED: { label: "Fee requested", tone: "outline" },
   PROOF_RECEIVED: { label: "Payment received", tone: "running", running: true },
   VERIFIED: { label: "Payment verified", tone: "running", running: true },
   SETTLE_SUBMITTED: { label: "Settling", tone: "running", running: true },
   SETTLED: { label: "Settled", tone: "info" },
   CONFIRMED: { label: "Settled on chain", tone: "success" },
   RECONCILED: { label: "Reconciled", tone: "success" },
-  VERIFY_FAILED: { label: "Payment rejected", tone: "danger", terminal: true },
-  SETTLE_FAILED: { label: "Settlement failed", tone: "danger", terminal: true },
+  VERIFY_FAILED: { label: "Fee not settled", tone: "outline", terminal: true },
+  SETTLE_FAILED: { label: "Fee not settled", tone: "outline", terminal: true },
   EXPIRED_UNSETTLED: { label: "Expired, not charged", tone: "neutral", terminal: true },
   UNKNOWN: { label: "Settlement unknown", tone: "unknown", running: true },
 };

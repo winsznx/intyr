@@ -16,11 +16,10 @@ import {
   Ring,
   Skeleton,
   TripStateChip,
-  UnknownNotice,
 } from "../../components/ui";
 import { api } from "../../lib/api";
-import { algoExplorerTx, formatDateTime, formatMoney, relativeTime } from "../../lib/format";
-import { COMPONENT_TYPE, describeReason, tripState } from "../../lib/labels";
+import { algoExplorerTx, formatDateTime, formatMoney } from "../../lib/format";
+import { COMPONENT_TYPE, UNKNOWN_COPY, describeReason, tripState } from "../../lib/labels";
 import type { NextAction, Trip } from "../../lib/types";
 import { useResource } from "../../lib/use-resource";
 
@@ -158,6 +157,45 @@ export function TripPage() {
   );
 }
 
+const STRONG: Partial<Record<string, string>> = {
+  COMMIT_STATUS_UNKNOWN: "dark",
+  MANUAL_REVIEW: "review",
+  RECOVERING: "attention",
+  RECOVERY_FAILED: "failed",
+};
+
+function names(list: Trip["components"]): string {
+  const words = list.map((c) => COMPONENT_TYPE[c.type] ?? c.type);
+  if (words.length <= 1) return words.join("");
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+function sentenceStart(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
+/** One sentence built only from component states, so it reads in five seconds and never claims more than the record. */
+export function recoverySentence(trip: Trip): string {
+  const failed = trip.components.filter((c) => c.state === "COMMIT_FAILED" || c.state === "UNAVAILABLE");
+  const cancelled = trip.components.filter((c) => c.state === "CANCELLED");
+  const replaced = trip.components.filter((c) => c.state === "REPLACED");
+  const booked = trip.components.filter((c) => c.state === "CONFIRMED");
+  const parts: string[] = [];
+  if (failed.length) parts.push(`${sentenceStart(names(failed))} failed at commit.`);
+  if (cancelled.length) parts.push(`${sentenceStart(names(cancelled))} cancelled inside the limit.`);
+  if (replaced.length) parts.push(`${sentenceStart(names(replaced))} replaced.`);
+  parts.push(booked.length ? `Still booked: ${names(booked).toLowerCase()}.` : "Nothing left booked.");
+  return parts.join(" ");
+}
+
+function earliestClock(trip: Trip): string | undefined {
+  const times = trip.components
+    .flatMap((c) => [c.price_valid_until, c.inventory_held_until])
+    .filter((t): t is string => Boolean(t))
+    .sort();
+  return times[0] ?? trip.deadline;
+}
+
 function VerdictStrip({
   trip,
   actions,
@@ -178,120 +216,126 @@ function VerdictStrip({
   const commit = find("COMMIT");
   const revalidate = find("REVALIDATE");
   const recover = find("RECOVER");
-  const approval = find("REQUEST_APPROVAL");
-  const deadline = actions.find((a) => a.deadline)?.deadline ?? trip.deadline;
   const committed = trip.components.filter((c) => c.state === "CONFIRMED").length;
   const refused = [...(trip.decisions ?? [])].reverse().find((d) => d.outcome === "REFUSE" && (d.gate === "COMMIT" || d.gate === "PREPARE"));
+  const review = [...(trip.decisions ?? [])].reverse().find((d) => d.outcome === "MANUAL_REVIEW");
+  const unknownDecision = [...(trip.decisions ?? [])].reverse().find((d) => d.outcome === "UNKNOWN");
+  const allSandbox = trip.components.length > 0 && trip.components.every((c) => c.evidence_grade !== "SUPPLIER_PRODUCTION" && c.evidence_grade !== "SUPPLIER_SIGNED");
+  const clock = earliestClock(trip);
+  const validUntil = clock ? `valid until ${formatDateTime(clock)}` : "valid for a limited time";
+  const failedLeg = trip.components.find((c) => c.state === "COMMIT_FAILED" || c.state === "UNAVAILABLE");
+  const stillBooked = trip.components.filter((c) => c.state === "CONFIRMED");
+  const strong = STRONG[trip.state];
 
-  let headline: ReactNode;
-  let explain: ReactNode;
+  let headline: ReactNode = state.label;
+  let explain: ReactNode = null;
   switch (trip.state) {
+    case "DRAFT":
+      explain = "Not sent to any supplier yet.";
+      break;
+    case "CHECKED":
+      explain = "Check only. No supplier was contacted and this plan cannot be committed.";
+      break;
     case "PREPARING":
-      headline = "Checking each supplier";
-      explain = "Intyr is asking each supplier for a current price and, where the supplier allows it, a hold. Nothing is booked yet.";
+      explain = `Checking ${trip.components.length || "the"} components with suppliers.`;
       break;
     case "REVALIDATING":
-      headline = "Rechecking prices";
-      explain = "Current prices are being compared with the manifest. Nothing is booked.";
+      explain = "Checking prices and availability again.";
       break;
     case "PREPARED":
     case "PREPARED_WITH_WARNINGS":
     case "READY_TO_COMMIT":
       if (refused && !commit?.allowed) {
         headline = "Intyr will not commit this trip";
-        explain = `${describeReason(refused.reason_codes?.[0] ?? commit?.reason ?? "POLICY_DENIED")} Nothing was booked. Prepare a different trip or change its limits.`;
-        break;
+        explain = `Intyr did not commit because ${describeReason(refused.reason_codes?.[0] ?? commit?.reason ?? "POLICY_DENIED").replace(/\.$/, "").replace(/^./, (c) => c.toLowerCase())}. Nothing was booked. Prepare a different trip or change its limits.`;
+      } else if (trip.state === "PREPARED_WITH_WARNINGS") {
+        explain = commit?.reason ? describeReason(commit.reason) : "Review the warnings below before committing.";
+      } else if (trip.state === "READY_TO_COMMIT") {
+        explain = `Plan ${validUntil}. The commit fee is sponsored in the sandbox.`;
+      } else {
+        explain = `Plan ready, ${validUntil}.`;
       }
-      headline = trip.approval?.required ? "Needs approval before commit" : commit?.allowed ? "Ready to commit" : "Prepared";
-      explain = commit?.allowed
-        ? "Every leg passed its checks. Committing books the legs in the order below and confirms each one through a second read."
-        : commit?.reason
-          ? describeReason(commit.reason)
-          : "Review the legs below before committing.";
       break;
     case "COMMITTING":
-      headline = `Committing, ${committed} of ${trip.components.length} confirmed`;
-      explain = "You can leave this page. The commit keeps running and this trip updates when each supplier is confirmed.";
+      headline = `Committing ${committed} of ${trip.components.length} components`;
+      explain = "You can leave this page. The commit continues on the server.";
       break;
     case "COMMIT_STATUS_UNKNOWN":
-      headline = "Booking status unknown";
-      explain = null;
+      explain = (
+        <>
+          {UNKNOWN_COPY}
+          {unknownDecision?.reconcile_by ? ` If Intyr cannot confirm by ${formatDateTime(unknownDecision.reconcile_by)}, this trip moves to manual review.` : null}
+        </>
+      );
       break;
     case "COMMITTED_UNVERIFIED":
-      headline = "Committed, verifying with suppliers";
-      explain = "Every supplier replied. Intyr is reading each booking back before calling the trip committed.";
+      explain = "Every component is confirmed. Intyr re-reads each supplier before marking the trip committed.";
       break;
     case "COMMITTED":
-      headline = "Committed";
-      explain = "Every leg was confirmed by a read after the booking. The receipt below can be checked by anyone.";
+      explain = `Every component was confirmed by a supplier read after booking.${allSandbox ? " References are sandbox or simulated. Nothing real was booked." : ""}`;
       break;
     case "COMMIT_NOT_EXECUTED":
-      headline = "Not committed";
-      explain = "Intyr refused the commit before any supplier was booked. Nothing needs to be undone.";
+      explain = `The commit did not run: ${describeReason(refused?.reason_codes?.[0] ?? "TRIP_STATE_CONFLICT").replace(/\.$/, "").toLowerCase()}.${stillBooked.length === 0 ? " No component was booked." : ""}`;
       break;
     case "RECOVERING":
-      headline = "Recovering";
-      explain = "A leg failed after others were booked. Intyr is cancelling or replacing legs inside the limits set before payment.";
+      explain = `${failedLeg ? sentenceStart(COMPONENT_TYPE[failedLeg.type] ?? failedLeg.type) : "A component"} failed at the supplier. Intyr is running the recovery accepted before commit.`;
       break;
     case "RECOVERED":
-      headline = "Recovered";
-      explain = "Every leg ended in a consistent state: either kept, cancelled or replaced inside the agreed limits.";
+      explain = recoverySentence(trip);
       break;
     case "RECOVERY_FAILED":
-      headline = "Recovery failed";
-      explain = "Some legs could not be undone or replaced. The legs below show exactly what is still booked.";
+      explain = `Recovery stopped before the trip reached a consistent state. Still booked: ${stillBooked.length ? names(stillBooked).toLowerCase() : "nothing"}.`;
       break;
     case "MANUAL_REVIEW":
-      headline = "Needs a person to decide";
-      explain = "Automation stopped because the next step needs judgment. The decision log explains what is being asked.";
+      explain = review?.reason_codes?.length ? describeReason(review.reason_codes[0] ?? "") : "A person has to decide before anything moves.";
       break;
     case "PREPARATION_FAILED":
-      headline = "Preparation failed";
-      explain = "No supplier was booked. The decision log explains which leg failed.";
+      explain = "No booking was made. The decision log names the component that could not be prepared.";
       break;
-    case "CHECKED":
-      headline = "Plan checked";
-      explain = "This plan was evaluated from offers the agent supplied. Intyr did not call any supplier.";
+    case "CANCELLED":
+      explain = "This trip was cancelled. The legs below show what was cancelled.";
       break;
-    default:
-      headline = state.label;
-      explain = null;
+    case "SERVICING":
+      explain = "Not handled in this release.";
+      break;
   }
 
+  const blocked = trip.state === "COMMIT_STATUS_UNKNOWN";
+
   return (
-    <section className={`verdict verdict-${state.tone}`} aria-live="polite">
+    <section className="verdict" data-role="verdict-strip" data-strength={strong} aria-live="polite">
       <div className="verdict-main">
         <div className="row">
           <TripStateChip state={trip.state} />
-          {trip.environment !== "MAINNET" ? <Chip tone="amber">TestNet sandbox</Chip> : null}
-          {deadline && !state.terminal ? <span className="meta">Offer valid {relativeTime(deadline)?.startsWith("in ") ? `for ${relativeTime(deadline)?.slice(3)}` : `until ${formatDateTime(deadline)}`}</span> : null}
+          {trip.environment !== "MAINNET" ? <Chip tone="outline">TestNet sandbox</Chip> : null}
         </div>
         <h1 className="verdict-title">{headline}</h1>
-        {trip.state === "COMMIT_STATUS_UNKNOWN" ? <UnknownNotice /> : explain ? <p className="verdict-explain">{explain}</p> : null}
+        {explain ? <p className="verdict-explain">{explain}</p> : null}
       </div>
       <div className="verdict-actions">
-        {trip.approval?.required && trip.state !== "COMMITTED" ? (
-          <ButtonLink to={`/app/trips/${trip.trip_id}/approve`}>Review and approve</ButtonLink>
+        {!blocked && (trip.approval?.required || trip.state === "MANUAL_REVIEW") && !state.terminal ? (
+          <ButtonLink to={`/app/trips/${trip.trip_id}/approve`} variant={strong ? "dark" : "primary"}>
+            Review
+          </ButtonLink>
         ) : null}
-        {commit && !trip.approval?.required && !(refused && !commit.allowed) ? (
+        {!blocked && commit && !trip.approval?.required && !(refused && !commit.allowed) ? (
           <Button onClick={onCommit} disabled={!commit.allowed} loading={busy === "COMMIT"} title={commit.reason ? describeReason(commit.reason) : undefined}>
             Commit trip
           </Button>
         ) : null}
-        {recover ? (
+        {!blocked && recover ? (
           <Button variant="dark" onClick={onRecover} disabled={!recover.allowed} loading={busy === "RECOVER"}>
-            Run recovery
+            Start recovery
           </Button>
         ) : null}
-        {revalidate ? (
+        {!blocked && revalidate ? (
           <Button variant="secondary" onClick={onRevalidate} disabled={!revalidate.allowed} loading={busy === "REVALIDATE"}>
-            Recheck prices
+            Revalidate
           </Button>
         ) : null}
-        {approval && !trip.approval?.required ? <span className="meta">{describeReason(approval.reason ?? "APPROVAL_REQUIRED")}</span> : null}
-        {trip.manifest_id && ["COMMITTED", "RECOVERED", "RECOVERY_FAILED", "COMMIT_NOT_EXECUTED"].includes(trip.state) ? (
+        {trip.manifest_id && ["COMMITTED", "RECOVERED", "RECOVERY_FAILED", "COMMIT_NOT_EXECUTED", "CHECKED"].includes(trip.state) ? (
           <ButtonLink to={`/verify/${trip.manifest_id}`} variant="secondary">
-            <FileCheck2 aria-hidden size={16} /> View receipt
+            <FileCheck2 aria-hidden size={16} /> Open proof
           </ButtonLink>
         ) : null}
       </div>
@@ -389,8 +433,8 @@ function MoneyCard({ trip }: { trip: Trip }) {
         <dd className="num">{trip.maximum_total ? formatMoney(trip.maximum_total) : "Not set"}</dd>
         <dt>Stranded spend</dt>
         <dd className="num">{trip.stranded_spend ? formatMoney(trip.stranded_spend) : "None recorded"}</dd>
-        <dt>Protection</dt>
-        <dd>None in this release. No bond, insurance or guarantee backs this trip.</dd>
+        <dt>Recovery policy</dt>
+        <dd>Cancel what can be cancelled and stay inside the maximum set before commit. Protection: none in this release (assurance NONE).</dd>
         <dt>Supplier money</dt>
         <dd>Test mode or simulated. No real charge.</dd>
       </dl>

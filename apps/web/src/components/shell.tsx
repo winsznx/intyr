@@ -93,9 +93,10 @@ function SiteFooter() {
 /** Shown on every sandbox screen so nothing here reads as a live booking. */
 export function EnvStrip() {
   return (
-    <div className="env-strip" role="note">
-      <span className="env-dot" aria-hidden />
-      <span>Sandbox on Algorand TestNet. Suppliers are in test mode or simulated. Nothing here books real travel or moves real money.</span>
+    <div className="env-strip" role="note" data-role="sandbox-banner">
+      <span className="chip chip-enum">SANDBOX</span>
+      <span className="chip chip-enum">TESTNET</span>
+      <span>Suppliers: Duffel and LiteAPI in test mode, and Intyr's simulator. No real bookings. Sandbox fees are sponsored, so no USDC moves.</span>
     </div>
   );
 }

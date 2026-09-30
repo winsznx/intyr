@@ -38,26 +38,32 @@
   gap: 10px;
 }
 
-.verdict-unknown {
-  border-style: dashed;
-  border-color: var(--unknown-line);
+/* Four states need a person's attention and use a filled strip. COMMITTED stays calm. */
+.verdict[data-strength="dark"] {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: #ffffff;
+  outline: 1px dashed var(--ring-rest);
+  outline-offset: -8px;
 }
 
-.verdict-danger {
-  border-color: #f2c4c0;
-  box-shadow: inset 4px 0 0 var(--danger);
+.verdict[data-strength="dark"] .verdict-explain {
+  color: #ffffff;
 }
 
-.verdict-amber {
-  box-shadow: inset 4px 0 0 var(--amber);
+.verdict[data-strength="review"] {
+  background: var(--review-soft);
+  border-color: #f0dfbd;
 }
 
-.verdict-review {
-  box-shadow: inset 4px 0 0 #c98a14;
+.verdict[data-strength="attention"] {
+  background: var(--amber-soft);
+  border-color: #efdcb8;
 }
 
-.verdict-success {
-  box-shadow: inset 4px 0 0 var(--success);
+.verdict[data-strength="failed"] {
+  background: var(--danger-soft);
+  border-color: #f5c9c6;
 }
 
 /* Decision log */

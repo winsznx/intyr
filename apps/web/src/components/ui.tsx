@@ -2,14 +2,15 @@ import { useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode 
 import { Link } from "react-router";
 import {
   AlertTriangle,
+  ArrowRight,
   Ban,
   Check,
   CircleCheck,
   CircleDashed,
+  CircleDot,
   CircleHelp,
   Copy,
   Eye,
-  Lock,
   Minus,
   RotateCcw,
   WifiOff,
@@ -47,7 +48,7 @@ const TONE_GLYPH: Partial<Record<Tone, ReactNode>> = {
   amber: <AlertTriangle aria-hidden />,
   review: <Eye aria-hidden />,
   unknown: <CircleHelp aria-hidden />,
-  info: <CircleCheck aria-hidden />,
+  info: <CircleDot aria-hidden />,
   outline: <CircleDashed aria-hidden />,
   neutral: <Minus aria-hidden />,
 };
@@ -59,6 +60,7 @@ export function Chip({
   enumStyle,
   icon,
   title,
+  state,
 }: {
   tone: Tone;
   children: ReactNode;
@@ -66,9 +68,11 @@ export function Chip({
   enumStyle?: boolean;
   icon?: ReactNode;
   title?: string;
+  /** The D4 name behind the label, exposed for tests and assistive tooling. */
+  state?: string;
 }) {
   return (
-    <span className={cx("chip", `tone-${tone}`, enumStyle && "chip-enum")} title={title}>
+    <span className={cx("chip", `tone-${tone}`, enumStyle && "chip-enum")} title={title} data-role={state ? "state-chip" : undefined} data-state={state}>
       {running ? <Ring label="In progress" /> : (icon ?? TONE_GLYPH[tone])}
       {children}
     </span>
@@ -76,7 +80,7 @@ export function Chip({
 }
 
 const DECISION_GLYPH: Record<DecisionOutcome, ReactNode> = {
-  ACT: <Check aria-hidden />,
+  ACT: <ArrowRight aria-hidden />,
   NO_ACTION: <Minus aria-hidden />,
   UNKNOWN: <CircleHelp aria-hidden />,
   REFUSE: <Ban aria-hidden />,
@@ -86,7 +90,7 @@ const DECISION_GLYPH: Record<DecisionOutcome, ReactNode> = {
 export function DecisionChip({ outcome }: { outcome: DecisionOutcome }) {
   const d = DECISION[outcome];
   return (
-    <Chip tone={d.tone} enumStyle icon={DECISION_GLYPH[outcome]} title={d.meaning}>
+    <Chip tone={d.tone} enumStyle icon={DECISION_GLYPH[outcome]} title={d.meaning} state={outcome}>
       {d.label}
     </Chip>
   );
@@ -95,7 +99,7 @@ export function DecisionChip({ outcome }: { outcome: DecisionOutcome }) {
 export function TripStateChip({ state }: { state: string }) {
   const s = tripState(state);
   return (
-    <Chip tone={s.tone} running={s.running}>
+    <Chip tone={s.tone} running={s.running} state={state}>
       {s.label}
     </Chip>
   );
@@ -104,7 +108,7 @@ export function TripStateChip({ state }: { state: string }) {
 export function ComponentStateChip({ state }: { state: string }) {
   const s = componentState(state);
   return (
-    <Chip tone={s.tone} running={s.running}>
+    <Chip tone={s.tone} running={s.running} state={state}>
       {s.label}
     </Chip>
   );
@@ -113,7 +117,7 @@ export function ComponentStateChip({ state }: { state: string }) {
 export function PaymentStateChip({ state }: { state: string }) {
   const s = paymentState(state);
   return (
-    <Chip tone={s.tone} running={s.running} icon={s.tone === "outline" ? <Lock aria-hidden /> : undefined}>
+    <Chip tone={s.tone} running={s.running} state={state}>
       {s.label}
     </Chip>
   );
