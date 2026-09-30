@@ -159,7 +159,17 @@ export const api = {
   runDemo: (scenario: string, seed?: number) => sandbox<DemoRun>("POST", "/demo/run", seed === undefined ? { scenario } : { scenario, seed }),
 
   getManifest: (manifestId: string, signal?: AbortSignal) => request<ManifestDocument>("GET", `${PUBLIC}/manifests/${encodeURIComponent(manifestId)}`, undefined, signal),
-  verifyManifest: (body: { manifest_id?: string; manifest?: unknown; txid?: string }) => request<VerifyResult>("POST", `${PUBLIC}/manifests/verify`, body),
+  verifyManifest: (body: { manifest_id?: string; manifest?: unknown; txid?: string }, base: typeof PUBLIC | typeof SANDBOX = PUBLIC) =>
+    request<VerifyResult>("POST", `${base}/manifests/verify`, body),
+  /** Mainnet first. A TestNet id resolves only on the sandbox host, so a 404 falls through to it. */
+  verifyAnywhere: async (body: { manifest_id?: string; manifest?: unknown; txid?: string }): Promise<VerifyResult & { answered_by: string }> => {
+    try {
+      return { ...(await request<VerifyResult>("POST", `${PUBLIC}/manifests/verify`, body)), answered_by: PUBLIC };
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 404) throw error;
+      return { ...(await request<VerifyResult>("POST", `${SANDBOX}/manifests/verify`, body)), answered_by: SANDBOX };
+    }
+  },
   getPrices: (base: typeof PUBLIC | typeof SANDBOX = PUBLIC, signal?: AbortSignal) => request<PriceTable>("GET", `${base}/prices`, undefined, signal),
   getStats: (signal?: AbortSignal) => request<PublicStats>("GET", `${PUBLIC}/stats/public`, undefined, signal),
   getEvidenceRun: (runId: string, signal?: AbortSignal) => request<EvidenceRun>("GET", `${PUBLIC}/evidence/runs/${encodeURIComponent(runId)}`, undefined, signal),

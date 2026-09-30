@@ -177,9 +177,9 @@ export const PROOF_STATE: Record<ProofState, { label: string; tone: Tone; explai
     explain: "The signature, the hash and the Algorand anchor all match this manifest.",
   },
   PROOF_PARTIAL: {
-    label: "Partly verified",
+    label: "Signature valid, not anchored",
     tone: "amber",
-    explain: "The signature and hash match. The chain anchor is still pending.",
+    explain: "The signature and the hash match a published Intyr key. No confirmed Algorand anchor was found for this record, so the chain check has not passed.",
   },
   SIGNATURE_INVALID: {
     label: "Signature does not match",

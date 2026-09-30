@@ -77,11 +77,11 @@
 }
 
 .section {
-  padding: 96px 0;
+  padding-block: 96px;
 }
 
 .section-tight {
-  padding: 64px 0;
+  padding-block: 64px;
 }
 
 .section-head {
@@ -162,7 +162,7 @@
   }
 
   .section {
-    padding: 72px 0;
+    padding-block: 72px;
   }
 
   .section-head {
