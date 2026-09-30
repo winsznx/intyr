@@ -177,6 +177,7 @@ describe("liteapi-hotels", () => {
     expect(res.leg.price).toEqual({ amount_minor: 18050, currency: "USD" });
     expect(res.leg.preparation_mode).toBe("REVALIDATED");
     expect(res.leg.clocks.free_cancel_until).toBe("2026-11-01T00:00:00.000Z");
+    expect(res.leg.clocks.price_valid_until).toBe("2026-10-01T12:05:00.000Z");
     expect(res.leg.irreversible).toBe(false);
     expect((calls[1]!.body as { offerId: string }).offerId).toBe("OFF_CHEAP");
   });

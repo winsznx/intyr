@@ -39,6 +39,13 @@ const READ_TIMEOUT_MS = 30_000;
 /** Public sandbox examples use this property. Callers should pass hotel_ids. */
 const DEFAULT_HOTEL_IDS = ["lp1897"];
 
+/**
+ * LiteAPI states that a prebook locks price and availability "for a short period" and publishes no expiry. The prebook
+ * is a fresh price confirmation, so the leg is treated as priced for this long after it. The number is Intyr's own
+ * assumption, kept short on purpose. A commit after it needs a revalidate, and the book call still fails if the lock has lapsed.
+ */
+const PREBOOK_ASSUMED_WINDOW_MS = 5 * 60_000;
+
 /** LiteAPI error codes after which no booking exists. */
 const DEFINITE_REJECTIONS = new Set([2001, 4016, 4012]);
 const MAYBE_BOOKED = new Set([4005, 2013, 2014, 5000, 40900]);
@@ -378,7 +385,7 @@ export class LiteApiHotelsAdapter implements IntyrAdapter {
     if (!prebookId || amount === null) {
       return { ok: false, failure: { ok: false, reason: "SUPPLIER_ERROR", detail: "prebook response missing prebookId or price", retryable: true } };
     }
-    const { clocks, irreversible } = clocksFromPolicies(rec(firstRate.cancellationPolicies), null);
+    const { clocks, irreversible } = clocksFromPolicies(rec(firstRate.cancellationPolicies), iso(new Date(this.clock.now().getTime() + PREBOOK_ASSUMED_WINDOW_MS)));
     return { ok: true, prebookId, price: toMoney(amount, currency), clocks, irreversible, responseHash: await hashJson(res.body) };
   }
 
