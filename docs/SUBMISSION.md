@@ -11,8 +11,8 @@ Intyr
 ## One-liner
 
 When a supplier fails halfway through an agent's multi-supplier booking, Intyr unwinds what can still be
-undone and says exactly what cannot. Agents pay for each step in USDC over x402 on Algorand, with no account,
-and every step ends in a signed record anyone can check against the chain.
+undone and says exactly what cannot. Agents pay for each step in USDC over x402 on Algorand, with no account.
+Each step ends in a signed record, anchored on Algorand, that anyone can check.
 
 ## Description
 
@@ -29,7 +29,7 @@ of a safe commit as a paid x402 call.
 - `revalidate` re-checks a prepared trip. Any material change supersedes the manifest.
 - `commit` commits the exact manifest hash the agent approved. A timeout or a lost response becomes
   `COMMIT_STATUS_UNKNOWN` and is reconciled by reading the supplier, never retried blindly. A component
-  counts as confirmed only after an independent read-back.
+  counts as confirmed only after a separate read of the booking from the same supplier (evidence tier E1).
 - `recover` cancels what can still be cancelled inside limits set before payment. It keeps what cannot be
   undone and reports it.
 
@@ -41,10 +41,11 @@ Intyr's server.
 
 What is real and what is not, today:
 
-| Part | Status on 2026-09-30 |
+| Part | Status on 2026-10-01 |
 |---|---|
-| x402 payment ladder (settle before any supplier work, txid persisted, 202 with `payment_state` for an unknown settlement) | running on the TestNet sandbox |
-| Mainnet routes under `/v1` | live since 2026-09-30. Every paid route answers a Mainnet USDC 402 carrying the challenge tag, or refuses an unknown trip before charging (`check-402 --mainnet` passes all five) |
+| x402 payment ladder (settle before any supplier work, txid persisted, 202 with `payment_state` for an unknown settlement) | ran end to end once on Mainnet (RUN-001, team-paid). Sandbox calls are sponsored, so no TestNet payment has settled |
+| Mainnet routes under `/v1` | live. Every paid route answers an empty unpaid request with a Mainnet USDC 402 that carries the challenge tag and a Bazaar example (`check-402` passes all five) |
+| Demand | unproven. No payer outside the team yet |
 | Suppliers | seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit under policy `sandbox-supplier-v1` |
 | Real bookings | none. No production supplier is connected, and the manifests say so in their evidence grade |
 | Algorand anchors | enabled on both networks. The Mainnet anchor account `X6RVK5VDE2KQOEWURVUWGAPNEL5FYFTJXJFODKO55MN3JRX4DBQTPQ4BDQ` is funded and published in `/.well-known/intyr-signing-keys.json`. Records created before anchoring was enabled stay unanchored and verify as `PROOF_PARTIAL` |
@@ -68,8 +69,9 @@ What is real and what is not, today:
 | `POST /v1/trips/commit` | 0.50 USDC | A transaction manifest with per-leg confirmations read back from each supplier |
 | `POST /v1/trips/recover` | 0.25 USDC | A recovery record with per-leg outcome and realized loss |
 
-Prices stay at or below 1 USDC, because a stock x402 client refuses higher prices unless it is configured to
-allow them. The sandbox mirrors carry the same prices in TestNet USDC (ASA 10458941).
+Prices stay at or below 1 USDC. The stock `x402Client` in `@x402/core` 2.28.0 refuses any payment above its
+`DEFAULT_MAX_AMOUNT_PER_PAYMENT` of $1 unless the caller configures `spendControls`. The sandbox mirrors carry
+the same prices in TestNet USDC (ASA 10458941).
 
 ## Who pays
 
@@ -102,6 +104,16 @@ RUN-001, on 2026-10-01, was a team-controlled payment, labeled `INTERNAL_VALIDAT
 Check it without trusting Intyr's server: `pnpm --filter @intyr/verifier verify pln_357c45b828fabcb25b5e271e`
 returns `PROOF_VERIFIED`. The payment itself can be read from any Algorand indexer at the txid above.
 
+Three facts about this payment, stated plainly:
+- The team payer was funded from the payTo itself: 0.5 ALGO in `AHFG5ESU7PJKM2TFTDAYTSDPTBNBENKKJBNIA373EM45DFRFJCBQ`
+  (round 65551003) and 3.0 USDC in `H2ZJWXTXJ5GPZYHQHV6DSAOHO27NIJAPBM7KZWQR46AY3A7UYMUQ` (round 65551483). So
+  RUN-001 is Intyr paying itself. Count it as a self-payment that proves the path works, not as volume.
+- The plan doesn't name the payment, so the chain alone doesn't tie them together. The link is Intyr's own
+  record: `GET /v1/payments/pay_f19a31ecb1d6d5b3bdb731e0` returns the payment txid and operation
+  `ops_b2fc1a7f3b986253d1bb2dae`.
+- Look-alike accounts have been sending dust to imitate the payTo and the anchor account. Copy addresses from
+  this file or `/.well-known/x402`, never from explorer history.
+
 After this settle, GoPlausible lists `POST https://intyr.timjosh507.workers.dev/v1/trips/check` in the Bazaar,
 on Algorand Mainnet with the challenge tag. The tagged 24-hour challenge leaderboard showed Intyr at rank 24
 with 1 settle and 0.10 USDC. That volume is the team's own payment. It is labeled `INTERNAL_VALIDATION` in
@@ -114,12 +126,15 @@ current description is more careful, and a listing refresh from the merchant das
 
 ```sh
 pnpm install
-pnpm --filter @intyr/verifier verify <manifest_id> --sandbox            # add --key <x> to pin the key
+pnpm --filter @intyr/verifier verify pln_357c45b828fabcb25b5e271e       # RUN-001 on Mainnet, PROOF_VERIFIED
+pnpm --filter @intyr/verifier verify <manifest_id> --sandbox            # any sandbox record; --key <x> pins the key
 ```
 
-The verifier checks the Ed25519 signature against the published key. It then checks the payload hash and the
-component and decision Merkle roots, reads the anchor note from a public Algorand indexer, and matches every
-listed payment against the USDC transfer on chain. It exits 0 only for `PROOF_VERIFIED`.
+The verifier checks the Ed25519 signature against the published key. For manifests, it then checks the payload
+hash and the component and decision Merkle roots. It reads the anchor note from a public Algorand indexer, and
+matches every listed payment against the USDC transfer on chain. It exits 0 only for `PROOF_VERIFIED`. Any
+other state, such as `PROOF_PARTIAL` for an unanchored sandbox record, exits 1, and pnpm then prints
+`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`. That line is pnpm passing on the exit code, not a crash.
 
 ## Evidence
 
@@ -157,9 +172,9 @@ rule, the claim is narrowed to this, quoted from RESULTS.md:
 > step, 2.9 calls per trip from the caller's side, with signed manifests and decision records, and it matched
 > that script in ten of eleven cells and lost one.
 
-The F10 loss and the first real-supplier failure share one cause, the tie-break among equally risky legs.
-Committing the weakest hold first is the recorded next change. It was not made during the campaign, so these
-numbers describe the code that ran.
+F10 has no fix yet. Both of its legs look the same at prepare, and nothing in either quote says the hotel will
+refuse to cancel, so no ordering rule can tell them apart without being fitted to this test. The code was not
+changed during the campaign, so these numbers describe the code that ran.
 
 A real-supplier sandbox trip committed cleanly. It's trip `trp_0f0591dc5e1c0d4b920b33a9`, with transaction
 manifest `man_6e12c241db89cf1968e97636`.
