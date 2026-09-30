@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { ExternalLink, FileCheck2, RefreshCw } from "lucide-react";
 import { ActionResult, type ActionOutcome } from "../../components/action-result";
 import { AppBar } from "../../components/shell";
+import { RecoveryTimeline } from "../../components/recovery-timeline";
 import { RailsLegend, TripRails } from "../../components/trip-rails";
 import {
   Button,
@@ -140,6 +141,8 @@ export function TripPage() {
             <RailsLegend />
           </div>
         </section>
+
+        <RecoveryTimeline trip={t} />
 
         <div className="split">
           <div className="stack">
@@ -351,7 +354,10 @@ function DecisionLog({ trip }: { trip: Trip }) {
                   <span className="decision-gate">{gateLabel(d.gate)}</span>
                   {d.subject?.component_id ? <span className="meta">{componentLabel(d.subject.component_id)}</span> : null}
                 </div>
-                <span className="meta">{formatDateTime(d.decided_at)}</span>
+                <span className="meta">
+                  {formatDateTime(d.decided_at)}
+                  {d.policy_version ? <span className="mono"> {d.policy_version}</span> : null}
+                </span>
               </div>
               <ReasonList codes={d.reason_codes} />
               {d.outcome === "UNKNOWN" && d.reconcile_by ? <p className="meta">Intyr keeps checking until {formatDateTime(d.reconcile_by)}, then asks a person.</p> : null}

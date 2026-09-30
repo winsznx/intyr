@@ -119,6 +119,8 @@ export interface GateDecision {
   reconcile_by?: string;
   required_role?: string;
   decision_hash?: string;
+  policy_version?: string;
+  kernel_version?: string;
 }
 
 export interface ComponentClocks {
