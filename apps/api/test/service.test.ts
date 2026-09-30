@@ -33,6 +33,8 @@ const session = (route: string): PaymentSession => ({
   updated_at: "",
 });
 
+const OWNER = { payer: "PAYER" };
+
 const ctx = (route: string, body: unknown): PaidContext => ({ network: "testnet", sponsored: false, body, session: session(route), operationId: "ops_test", now: new Date().toISOString() });
 
 async function setup(now = new Date()) {
@@ -90,7 +92,7 @@ describe("prepare and commit through the simulator", () => {
     expect(["PREPARED", "PREPARED_WITH_WARNINGS"]).toContain(prep.body.state);
 
     const body = commitBody(tripId, prep);
-    expect(await precheckCommit(body, s.deps)).toBeNull();
+    expect(await precheckCommit(body, s.deps, OWNER)).toBeNull();
     const res = await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
     expect(res.status).toBe(200);
     expect(res.body.state).toBe("COMMITTED");
@@ -113,7 +115,7 @@ describe("prepare and commit through the simulator", () => {
     const body = commitBody(tripId, prep);
     await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
     const attemptsBefore = (await s.store.listAttempts(tripId)).length;
-    const replay = await precheckCommit(body, s.deps);
+    const replay = await precheckCommit(body, s.deps, OWNER);
     expect(replay?.status).toBe(200);
     expect(replay?.body.outcome).toBe("NO_ACTION");
     expect(replay?.body.reason_codes).toContain("COMMIT_ALREADY_COMPLETED");
@@ -125,7 +127,7 @@ describe("prepare and commit through the simulator", () => {
     const s = await setup();
     const prep = await prepare(s, baseIntent());
     const body = { ...commitBody(prep.tripId!, prep), manifest_hash: "sha256:" + "0".repeat(64) };
-    const refused = await precheckCommit(body, s.deps);
+    const refused = await precheckCommit(body, s.deps, OWNER);
     expect(refused?.status).toBe(422);
     expect(refused?.body.reason_codes).toContain("MANIFEST_HASH_MISMATCH");
     expect(refused?.body.charged).toBe(false);
@@ -176,10 +178,10 @@ describe("failure handling", () => {
     expect(paused.doc.components.find((c) => c.component_id === "flight-2")?.state).toBe("PREPARED");
 
     // While unknown, a second commit is a free replay and recovery refuses to act blind.
-    const replay = await precheckCommit(body, s.deps);
+    const replay = await precheckCommit(body, s.deps, OWNER);
     expect(replay?.body.outcome).toBe("NO_ACTION");
     expect(replay?.body.reason_codes).toContain("COMMIT_ALREADY_STARTED");
-    const pre = await precheckRecover({ trip_id: tripId }, s.deps);
+    const pre = await precheckRecover({ trip_id: tripId }, s.deps, OWNER);
     expect(pre?.body.outcome).toBe("UNKNOWN");
     const hotelAttempts = () => s.store.listAttempts(tripId).then((a) => a.filter((x) => x.component_id === "hotel-1" && x.action === "COMMIT"));
     expect(await hotelAttempts()).toHaveLength(1);
@@ -196,11 +198,15 @@ describe("failure handling", () => {
 
   it("resumes a sponsored sandbox commit that has no payment session, and leaves a Mainnet trip without one alone", async () => {
     const s = await setup();
-    const sponsored = (route: string, body: unknown): PaidContext => ({ network: "testnet", sponsored: true, sandboxSessionId: "sbx_test", body, session: null, operationId: "spons_test", now: new Date().toISOString() });
-    const prep = await prepare(s, baseIntent([{ component_index: 0, fault: "TIMEOUT_BOOKED" }]));
+    const sandbox = await s.store.createSandboxSession(new Date(s.clockState.t).toISOString());
+    const sponsored = (body: unknown): PaidContext => ({ network: "testnet", sponsored: true, sandboxSessionId: sandbox.id, body, session: null, operationId: "spons_test", now: new Date().toISOString() });
+    const intent = baseIntent([{ component_index: 0, fault: "TIMEOUT_BOOKED" }]);
+    const parsed = parseIntent(intent);
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+    const prep = await runPrepare(parsed.value, sponsored(intent), s.deps, sandbox.id);
     const tripId = prep.tripId!;
     const body = commitBody(tripId, prep);
-    const res = await runCommit(body, sponsored("POST /sandbox/v1/trips/commit", body), s.deps);
+    const res = await runCommit(body, sponsored(body), s.deps);
     expect(res.status).toBe(202);
     s.clockState.t += 120_000;
 
@@ -219,7 +225,7 @@ describe("failure handling", () => {
     const tripId = prep.tripId!;
     const body = commitBody(tripId, prep);
     await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
-    const pre = await precheckRecover({ trip_id: tripId }, s.deps);
+    const pre = await precheckRecover({ trip_id: tripId }, s.deps, OWNER);
     expect(pre?.body.outcome).toBe("NO_ACTION");
     expect(pre?.body.supplier_calls_made).toBe(0);
     expect(pre?.body.charged).toBe(false);
@@ -259,11 +265,11 @@ describe("sandbox supplier policy", () => {
     expect(decisions.find((d) => d.gate === "PREPARE")).toMatchObject({ outcome: "MANUAL_REVIEW", policy_version: "sandbox-supplier-v1", required_role: "SESSION_APPROVER" });
 
     const body = commitBody(prep.tripId!, prep);
-    const before = await precheckCommit(body, s.deps);
+    const before = await precheckCommit(body, s.deps, OWNER);
     expect(before?.body.outcome).toBe("MANUAL_REVIEW");
 
     await s.store.putApproval({ trip_id: prep.tripId!, manifest_hash: String(prep.body.manifest_hash), decision: "APPROVE", actor: "session:test", now: new Date().toISOString() });
-    expect(await precheckCommit(body, s.deps)).toBeNull();
+    expect(await precheckCommit(body, s.deps, OWNER)).toBeNull();
     const done = await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
     expect(done.body.outcome).toBe("ACT");
     const finalManifest = await s.store.getManifest(String(done.body.transaction_manifest_id));
@@ -287,6 +293,51 @@ describe("sandbox supplier policy", () => {
   });
 });
 
+describe("trip ownership", () => {
+  const STRANGER = { payer: "STRANGER" };
+
+  it("lets only the payer that prepared a trip revalidate, commit or recover it", async () => {
+    const s = await setup();
+    const prep = await prepare(s, baseIntent());
+    const tripId = prep.tripId!;
+    const body = commitBody(tripId, prep);
+
+    for (const refused of [await precheckCommit(body, s.deps, STRANGER), await precheckRecover({ trip_id: tripId }, s.deps, STRANGER), await precheckRevalidate({ trip_id: tripId }, s.deps, STRANGER)]) {
+      expect(refused).toMatchObject({ status: 403, body: { error: "NOT_TRIP_OWNER", charged: false } });
+    }
+    const strangerCtx = (route: string, b: unknown): PaidContext => ({ ...ctx(route, b), session: { ...session(route), payer: "STRANGER" } });
+    expect(await runCommit(body, strangerCtx("POST /sandbox/v1/trips/commit", body), s.deps)).toMatchObject({ status: 403, feeFailure: "COMMIT_NOT_EXECUTED" });
+    expect(await runRecover({ trip_id: tripId }, strangerCtx("POST /sandbox/v1/trips/recover", {}), s.deps)).toMatchObject({ status: 403 });
+    expect(await runRevalidate({ trip_id: tripId }, strangerCtx("POST /sandbox/v1/trips/revalidate", {}), s.deps)).toMatchObject({ status: 403 });
+    expect((await tripDoc(s, tripId)).state).toBe("PREPARED");
+    expect(await s.store.listAttempts(tripId)).toHaveLength(0);
+
+    expect(await precheckCommit(body, s.deps, OWNER)).toBeNull();
+    const done = await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
+    expect(done.body.outcome).toBe("ACT");
+  });
+
+  it("scopes a sponsored trip to its sandbox session, and an expired session owns nothing", async () => {
+    const s = await setup();
+    const a = await s.store.createSandboxSession(new Date(s.clockState.t).toISOString());
+    const b = await s.store.createSandboxSession(new Date(s.clockState.t).toISOString());
+    const sponsored = (sid: string, body: unknown): PaidContext => ({ network: "testnet", sponsored: true, sandboxSessionId: sid, body, session: null, operationId: "spons_test", now: new Date().toISOString() });
+    const intent = baseIntent();
+    const parsed = parseIntent(intent);
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+    const prep = await runPrepare(parsed.value, sponsored(a.id, intent), s.deps, a.id);
+    const body = commitBody(prep.tripId!, prep);
+
+    expect(await precheckCommit(body, s.deps, { sandboxSessionId: a.id })).toBeNull();
+    expect(await precheckCommit(body, s.deps, { sandboxSessionId: b.id })).toMatchObject({ status: 403 });
+    expect(await precheckCommit(body, s.deps, OWNER)).toMatchObject({ status: 403 });
+    expect(await runCommit(body, sponsored(b.id, body), s.deps)).toMatchObject({ status: 403 });
+
+    s.clockState.t += 25 * 3600_000;
+    expect(await precheckCommit(body, s.deps, { sandboxSessionId: a.id })).toMatchObject({ status: 403 });
+  });
+});
+
 describe("network scope", () => {
   it("treats a trip prepared on the other network as unknown in every trip-bound route, and does nothing to it", async () => {
     const s = await setup();
@@ -295,7 +346,7 @@ describe("network scope", () => {
     const other = { ...s.deps, environment: "MAINNET" as const, allowScenario: false };
     const body = commitBody(tripId, prep);
 
-    for (const refused of [await precheckCommit(body, other), await precheckRecover({ trip_id: tripId }, other), await precheckRevalidate({ trip_id: tripId }, other)]) {
+    for (const refused of [await precheckCommit(body, other, OWNER), await precheckRecover({ trip_id: tripId }, other, OWNER), await precheckRevalidate({ trip_id: tripId }, other, OWNER)]) {
       expect(refused).toMatchObject({ status: 404, body: { error: "NOT_FOUND", charged: false } });
     }
     expect(await runCommit(body, ctx("POST /v1/trips/commit", body), other)).toMatchObject({ status: 404 });
@@ -305,23 +356,23 @@ describe("network scope", () => {
     const untouched = await tripDoc(s, tripId);
     expect(untouched.state).toBe("PREPARED");
     expect(await s.store.listAttempts(tripId)).toHaveLength(0);
-    expect(await precheckCommit(body, s.deps)).toBeNull();
+    expect(await precheckCommit(body, s.deps, OWNER)).toBeNull();
   });
 });
 
 describe("revalidate", () => {
   it("refuses a bad body, an unknown trip and a trip in the wrong state before any charge", async () => {
     const s = await setup();
-    const bad = await precheckRevalidate({}, s.deps);
+    const bad = await precheckRevalidate({}, s.deps, OWNER);
     expect(bad).toMatchObject({ status: 422, body: { error: "INVALID_REQUEST", charged: false } });
-    const unknown = await precheckRevalidate({ trip_id: "trp_000000000000000000000000" }, s.deps);
+    const unknown = await precheckRevalidate({ trip_id: "trp_000000000000000000000000" }, s.deps, OWNER);
     expect(unknown).toMatchObject({ status: 404, body: { reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } });
 
     const prep = await prepare(s, baseIntent());
-    expect(await precheckRevalidate({ trip_id: prep.tripId }, s.deps)).toBeNull();
+    expect(await precheckRevalidate({ trip_id: prep.tripId }, s.deps, OWNER)).toBeNull();
     const body = commitBody(prep.tripId!, prep);
     await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
-    const committed = await precheckRevalidate({ trip_id: prep.tripId }, s.deps);
+    const committed = await precheckRevalidate({ trip_id: prep.tripId }, s.deps, OWNER);
     expect(committed).toMatchObject({ status: 409, body: { error: "TRIP_STATE_CONFLICT", state: "COMMITTED", charged: false } });
   });
 

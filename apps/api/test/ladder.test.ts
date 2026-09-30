@@ -178,6 +178,25 @@ describe("payment ladder", () => {
     expect(sessions?.n).toBe(0);
   });
 
+  it("hands the payment's sender to the precheck, so a stranger is refused before anything settles", async () => {
+    const owner = newPayer();
+    h = await harness({
+      "POST /v1/trips/commit": {
+        precheck: async (_body, actor) => (actor.payer === owner.addr ? null : { status: 403, body: { error: "NOT_TRIP_OWNER", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } }),
+        handler: async () => ({ status: 200, body: { state: "COMMITTED" } }),
+      },
+    });
+    const stranger = await pay("/sandbox/v1/trips/commit", { trip_id: "trp_1" });
+    expect(stranger.res.status).toBe(403);
+    expect(await stranger.res.json()).toMatchObject({ error: "NOT_TRIP_OWNER", charged: false });
+    expect(h.fac.calls.settle).toBe(0);
+    const before = await h.db.prepare("SELECT COUNT(*) AS n FROM payment_sessions").first<{ n: number }>();
+    expect(before?.n).toBe(0);
+
+    const mine = await pay("/sandbox/v1/trips/commit", { trip_id: "trp_1" }, { payer: owner });
+    expect(mine.res.status).toBe(200);
+  });
+
   it("answers every paid route with a 402 to an empty body, which is what payment tooling sends", async () => {
     // The harness implements these three. A route with no implementation answers 503 instead, so nobody is offered a payment for it.
     for (const path of ["check", "commit", "recover"]) {

@@ -51,7 +51,7 @@ export async function runSponsored(
   }
 
   if (route.precheck) {
-    const refused = await route.precheck(body);
+    const refused = await route.precheck(body, { sandboxSessionId: deps.sandboxSessionId });
     if (refused) return c.json({ ...refused.body, payment_state: "SPONSORED", payment_txid: null, charged: false }, refused.status as 400);
   }
 

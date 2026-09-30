@@ -94,15 +94,15 @@ export function createDomain(env: Env, environment: Environment): Domain {
       },
     },
     "POST /v1/trips/revalidate": {
-      precheck: (body) => precheckRevalidate(body, deps),
+      precheck: (body, actor) => precheckRevalidate(body, deps, actor),
       handler: (ctx) => runRevalidate(ctx.body, ctx, deps),
     },
     "POST /v1/trips/commit": {
-      precheck: (body) => precheckCommit(body, deps),
+      precheck: (body, actor) => precheckCommit(body, deps, actor),
       handler: (ctx) => runCommit(ctx.body, ctx, deps),
     },
     "POST /v1/trips/recover": {
-      precheck: (body) => precheckRecover(body, deps),
+      precheck: (body, actor) => precheckRecover(body, deps, actor),
       handler: (ctx) => runRecover(ctx.body, ctx, deps),
     },
   };

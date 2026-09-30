@@ -1,18 +1,20 @@
 import { RecoverRequestSchema, makeDecision, parseWith, type TripState } from "@intyr/core";
 import type { HandlerResult, PaidContext } from "../../payments/ladder";
 import type { TripDoc } from "../trip-doc";
-import { DecisionLog, getTripOnNetwork, type ServiceDeps } from "./context";
+import type { PaidActor } from "../../payments/ladder";
+import { DecisionLog, NOT_TRIP_OWNER, actorOwnsTrip, getTripOnNetwork, type ServiceDeps } from "./context";
 import { finalizeManifest, performRecovery, RECOVERY_POLICY_VERSION } from "./recover";
 import { httpForOutcome } from "./commit";
 
 const RECOVERABLE: TripState[] = ["RECOVERING", "COMMITTING"];
 
 /** Free when there is nothing to recover or the state is unknown: a foreseeable non-action costs nothing. */
-export async function precheckRecover(body: unknown, deps: ServiceDeps): Promise<HandlerResult | null> {
+export async function precheckRecover(body: unknown, deps: ServiceDeps, actor: PaidActor): Promise<HandlerResult | null> {
   const parsed = parseWith(RecoverRequestSchema, body);
   if (!parsed.ok) return { status: 422, body: { error: "INVALID_REQUEST", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], issues: parsed.issues, charged: false } };
   const row = await getTripOnNetwork(deps, parsed.value.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } };
+  if (!(await actorOwnsTrip(deps, row, actor))) return { ...NOT_TRIP_OWNER };
   const state = row.state as TripState;
   if (RECOVERABLE.includes(state)) return null;
 
@@ -73,7 +75,9 @@ async function withPrev(log: DecisionLog): Promise<{ prev_decision_hash?: string
 export async function runRecover(body: unknown, ctx: PaidContext, deps: ServiceDeps): Promise<HandlerResult> {
   const parsed = parseWith(RecoverRequestSchema, body);
   if (!parsed.ok) return { status: 422, body: { error: "INVALID_REQUEST", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], issues: parsed.issues } };
-  if (!(await getTripOnNetwork(deps, parsed.value.trip_id))) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } };
+  const owned = await getTripOnNetwork(deps, parsed.value.trip_id);
+  if (!owned) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } };
+  if (!(await actorOwnsTrip(deps, owned, { ...(ctx.session?.payer ? { payer: ctx.session.payer } : {}), ...(ctx.sandboxSessionId ? { sandboxSessionId: ctx.sandboxSessionId } : {}) }))) return { ...NOT_TRIP_OWNER, feeFailure: "COMMIT_NOT_EXECUTED" };
   const result = await performRecovery(deps, parsed.value.trip_id, { allowReplacement: parsed.value.allow_replacement, headroomMinor: parsed.value.replacement_headroom_minor });
   const row = (await deps.store.getTrip(parsed.value.trip_id))!;
   const doc = JSON.parse(row.doc_json) as TripDoc;

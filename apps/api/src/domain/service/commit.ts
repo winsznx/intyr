@@ -21,7 +21,8 @@ import type { HandlerResult, PaidContext } from "../../payments/ladder";
 import type { AttemptRow, ManifestRow, TripRow } from "../store";
 import { VersionConflictError } from "../store";
 import type { TripComponentDoc, TripDoc } from "../trip-doc";
-import { DecisionLog, getTripOnNetwork, type ServiceDeps } from "./context";
+import type { PaidActor } from "../../payments/ladder";
+import { DecisionLog, NOT_TRIP_OWNER, actorOwnsTrip, getTripOnNetwork, type ServiceDeps } from "./context";
 import { finalizeManifest, performRecovery } from "./recover";
 import { updateTripDoc } from "./trip-update";
 
@@ -91,11 +92,12 @@ async function gateInput(deps: ServiceDeps, row: TripRow, request: CommitRequest
  * Runs before any charge. A foreseeable refusal, unknown or replay costs nothing. Returns null only
  * when the commit gate says ACT.
  */
-export async function precheckCommit(body: unknown, deps: ServiceDeps): Promise<HandlerResult | null> {
+export async function precheckCommit(body: unknown, deps: ServiceDeps, actor: PaidActor): Promise<HandlerResult | null> {
   const parsed = parseCommit(body);
   if (!parsed.ok) return { status: 422, body: { error: "INVALID_REQUEST", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], issues: parsed.issues, charged: false } };
   const row = await getTripOnNetwork(deps, parsed.value.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } };
+  if (!(await actorOwnsTrip(deps, row, actor))) return { ...NOT_TRIP_OWNER };
   const decision = await decideCommit(await gateInput(deps, row, parsed.value), await new DecisionLog(deps.store, row.id, deps.now).prevHash());
   if (decision.outcome === "ACT") return null;
   await new DecisionLog(deps.store, row.id, deps.now).append(decision);
@@ -361,6 +363,7 @@ export async function runCommit(body: unknown, ctx: PaidContext, deps: ServiceDe
   const request = parsed.value;
   const row = await getTripOnNetwork(deps, request.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } };
+  if (!(await actorOwnsTrip(deps, row, { ...(ctx.session?.payer ? { payer: ctx.session.payer } : {}), ...(ctx.sandboxSessionId ? { sandboxSessionId: ctx.sandboxSessionId } : {}) }))) return { ...NOT_TRIP_OWNER, feeFailure: "COMMIT_NOT_EXECUTED" };
   const log = new DecisionLog(deps.store, row.id, deps.now);
   const gate = await decideCommit(await gateInput(deps, row, request), await log.prevHash());
   await log.append(gate);

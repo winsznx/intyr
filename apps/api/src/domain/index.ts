@@ -1,4 +1,4 @@
-import type { HandlerResult, PaidContext } from "../payments/ladder";
+import type { HandlerResult, PaidActor, PaidContext } from "../payments/ladder";
 
 export type RouteKey =
   | "POST /v1/trips/check"
@@ -9,7 +9,7 @@ export type RouteKey =
 
 export interface DomainHandler {
   /** Runs before any charge. A non-null result is returned to the caller and nothing is charged. */
-  precheck?: (body: unknown) => Promise<HandlerResult | null>;
+  precheck?: (body: unknown, actor: PaidActor) => Promise<HandlerResult | null>;
   /** Runs once per settled payment and must be idempotent on ctx.operationId. */
   handler: (ctx: PaidContext) => Promise<HandlerResult>;
 }

@@ -40,9 +40,15 @@ export interface PaidRoute {
    * request always gets the 402 first, because payment tooling probes routes with empty bodies and a 4xx there fails it.
    * Return null to continue to settlement.
    */
-  precheck?: (body: unknown) => Promise<HandlerResult | null>;
+  precheck?: (body: unknown, actor: PaidActor) => Promise<HandlerResult | null>;
   /** Runs once per settled payment. Must be idempotent on `operationId`. */
   handler: (ctx: PaidContext) => Promise<HandlerResult>;
+}
+
+/** Who is asking. A paid request knows its payer, a sponsored sandbox request knows its session. */
+export interface PaidActor {
+  payer?: string;
+  sandboxSessionId?: string;
 }
 
 export interface PaidContext {
@@ -275,7 +281,7 @@ export function createLadder(deps: LadderDeps) {
     }
     // Gate before charge. A proof already on file is a replay and gets its stored operation, so only a new proof is checked.
     if (route.precheck && !(await getSessionByTxid(deps.db, decoded.txid))) {
-      const refused = await route.precheck(body);
+      const refused = await route.precheck(body, { payer: decoded.sender, ...(getCookie(c, "intyr_sbx") ? { sandboxSessionId: getCookie(c, "intyr_sbx")! } : {}) });
       if (refused) return c.json(envelope(null, deps.net, { ...refused.body, charged: false }), refused.status as 400);
     }
     const payerClass: PayerClass = deps.teamWallets.includes(decoded.sender) ? "INTERNAL_VALIDATION" : "EXTERNAL_ANON";

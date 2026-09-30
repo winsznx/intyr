@@ -36,9 +36,9 @@ describe("prepare precheck", () => {
     const env = await domainEnv();
     const domain = createDomain(env, "TESTNET");
     const intent = { currency: "USD", budget_total_minor: 50000, components: [{ type: "FLIGHT", origin: "JFK", destination: "EWR", depart_date: "2026-11-10", passengers: 1 }, { type: "ESIM", merchant_id: "m1", max_price_minor: 1000 }] };
-    const refused = await domain.handlers["POST /v1/trips/prepare"]!.precheck!(intent);
+    const refused = await domain.handlers["POST /v1/trips/prepare"]!.precheck!(intent, {});
     expect(refused).toMatchObject({ status: 422, body: { error: "UNSUPPORTED_COMPONENT", charged: false, issues: [{ path: "components.1.type" }] } });
-    const ok = await domain.handlers["POST /v1/trips/prepare"]!.precheck!({ ...intent, components: [intent.components[0]] });
+    const ok = await domain.handlers["POST /v1/trips/prepare"]!.precheck!({ ...intent, components: [intent.components[0]] }, {});
     expect(ok).toBeNull();
   });
 });

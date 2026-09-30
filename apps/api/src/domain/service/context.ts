@@ -1,5 +1,6 @@
 import type { AdapterRegistry } from "@intyr/adapters";
 import type { AnchorRef, Environment, GateDecision, SigningKey } from "@intyr/core";
+import type { PaidActor } from "../../payments/ladder";
 import type { TripRow, TripStore } from "../store";
 
 export interface ServiceDeps {
@@ -22,6 +23,22 @@ export interface ServiceDeps {
 export async function getTripOnNetwork(deps: Pick<ServiceDeps, "store" | "environment">, tripId: string): Promise<TripRow | null> {
   const row = await deps.store.getTrip(tripId);
   return row && row.network === deps.environment.toLowerCase() ? row : null;
+}
+
+/** What the caller refuses with when a paid action names a trip it does not own. Nothing is charged or run. */
+export const NOT_TRIP_OWNER = { status: 403, body: { error: "NOT_TRIP_OWNER", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], message: "This trip belongs to another payer or sandbox session.", charged: false } } as const;
+
+/**
+ * A trip is owned by the payer that prepared it, or by the sandbox session it was prepared in. Holding its ids is not
+ * enough to commit, recover or revalidate it, because a published manifest hands those ids to anyone who reads it.
+ */
+export async function actorOwnsTrip(deps: Pick<ServiceDeps, "store" | "now">, row: Pick<TripRow, "owner">, actor: PaidActor): Promise<boolean> {
+  if (actor.payer && row.owner === `payer:${actor.payer}`) return true;
+  if (actor.sandboxSessionId && row.owner === `session:${actor.sandboxSessionId}`) {
+    const session = await deps.store.getSandboxSession(actor.sandboxSessionId);
+    return session !== null && Date.parse(session.expires_at) > deps.now().getTime();
+  }
+  return false;
 }
 
 /** Hash-chained decision log for one trip. Every gate decision is stored before its effect is applied. */
