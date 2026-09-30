@@ -72,19 +72,35 @@ export interface ProofReport {
   scope: { proves: string[]; does_not_prove: string[] };
 }
 
-const SCOPE: ProofReport["scope"] = {
-  proves: [
-    "The published Intyr key signed exactly this document.",
-    "Its component and decision roots match the records it contains.",
-    "When anchored, the document existed unchanged at the anchor round on Algorand.",
-    "Each listed payment is a confirmed USDC transfer with the recorded asset, receiver, amount and payer.",
-  ],
-  does_not_prove: [
-    "That a supplier kept a booking after it was read back, or that supplier or caller data is true.",
-    "Anything about components whose evidence grade is SIMULATED or CALLER_ASSERTED beyond what they claim.",
-    "That the published key belongs to Intyr, unless the key was pinned from a source other than the host being checked.",
-  ],
-};
+const SIGNED = "The published Intyr key signed exactly this document.";
+const ANCHORED = "When anchored, the document existed unchanged at the anchor round on Algorand.";
+const KEY_CAVEAT = "That the published key belongs to Intyr, unless the key was pinned from a source other than the host being checked.";
+
+function scopeOf(record: VerifiableManifest): ProofReport["scope"] {
+  if (record.schema_version === "commit-plan/1") {
+    return {
+      proves: [SIGNED, ANCHORED],
+      does_not_prove: [
+        "That the legs exist or are priced as described. A plan evaluates legs the caller supplied, and Intyr read none of them.",
+        "That anything was booked. A plan books nothing.",
+        KEY_CAVEAT,
+      ],
+    };
+  }
+  return {
+    proves: [
+      SIGNED,
+      "Its component and decision roots match the records it contains.",
+      ANCHORED,
+      "Each listed payment is a confirmed USDC transfer with the recorded asset, receiver, amount and payer.",
+    ],
+    does_not_prove: [
+      "That a supplier kept a booking after it was read back, or that supplier or caller data is true.",
+      "Anything about components whose evidence grade is SIMULATED or CALLER_ASSERTED beyond what they claim.",
+      KEY_CAVEAT,
+    ],
+  };
+}
 
 function endpointsFor(network: string, options: ProofOptions): ChainEndpoints | undefined {
   return options.endpoints?.[network] ?? networkByCaip2(network) ?? (network in NETWORKS ? NETWORKS[network as keyof typeof NETWORKS] : undefined);
@@ -161,7 +177,7 @@ export async function verifyProof(input: ProofInput, options: ProofOptions = {})
     key_id: signed.signature.key_id,
     evidence_banner: bannerOf(record),
     verified_at: (options.now?.() ?? new Date()).toISOString(),
-    scope: SCOPE,
+    scope: scopeOf(record),
   };
 
   const integrity = await verifyManifestDocument(signed, input.keys);

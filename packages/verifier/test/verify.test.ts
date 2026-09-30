@@ -288,13 +288,14 @@ describe("verifyProof on a signed commit plan", () => {
     // #when it is verified without an anchor
     const report = await verifyProof({ signed, keys: [publishedKey(key, NOW.toISOString())], anchor: null }, { endpoints: ENDPOINTS });
 
-    // #then the signature holds and the report names the plan, not a manifest
-    expect([report.integrity, report.proof_state, report.manifest_id, report.evidence_banner]).toEqual([
-      { ok: true },
-      "PROOF_PARTIAL",
-      signed.payload.plan_id,
-      "CALLER_ASSERTED",
-    ]);
+    // #then the signature holds, the report names the plan, and it claims no roots a plan does not have
+    expect([
+      report.integrity,
+      report.proof_state,
+      report.manifest_id,
+      report.evidence_banner,
+      report.scope.proves.some((line) => line.includes("roots")),
+    ]).toEqual([{ ok: true }, "PROOF_PARTIAL", signed.payload.plan_id, "CALLER_ASSERTED", false]);
   });
 });
 
