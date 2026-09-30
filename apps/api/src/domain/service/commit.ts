@@ -418,7 +418,8 @@ export async function reconcileUnknownTrips(deps: ServiceDeps, session: (tripId:
     const doc = JSON.parse(row.doc_json) as TripDoc;
     if (!doc.commit) continue;
     const s = await session(row.id);
-    if (!s) continue;
+    // Only sponsored sandbox commits, which exist on TestNet alone, have no payment session. A Mainnet commit always has one.
+    if (!s && deps.environment === "MAINNET") continue;
     const before = row.state;
     const after = await driveCommit(deps, row.id, { operationId: doc.commit.operation_id, session: s });
     if (after.state !== before) resolved++;

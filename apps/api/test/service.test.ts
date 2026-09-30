@@ -194,6 +194,25 @@ describe("failure handling", () => {
     expect(await hotelAttempts()).toHaveLength(1);
   });
 
+  it("resumes a sponsored sandbox commit that has no payment session, and leaves a Mainnet trip without one alone", async () => {
+    const s = await setup();
+    const sponsored = (route: string, body: unknown): PaidContext => ({ network: "testnet", sponsored: true, sandboxSessionId: "sbx_test", body, session: null, operationId: "spons_test", now: new Date().toISOString() });
+    const prep = await prepare(s, baseIntent([{ component_index: 0, fault: "TIMEOUT_BOOKED" }]));
+    const tripId = prep.tripId!;
+    const body = commitBody(tripId, prep);
+    const res = await runCommit(body, sponsored("POST /sandbox/v1/trips/commit", body), s.deps);
+    expect(res.status).toBe(202);
+    s.clockState.t += 120_000;
+
+    expect(await reconcileUnknownTrips({ ...s.deps, environment: "MAINNET" }, async () => null)).toBe(0);
+    expect((await tripDoc(s, tripId)).state).toBe("COMMIT_STATUS_UNKNOWN");
+
+    expect(await reconcileUnknownTrips(s.deps, async () => null)).toBe(1);
+    const final = await tripDoc(s, tripId);
+    expect(final.state).toBe("COMMITTED");
+    expect(final.doc.components.every((c) => c.state === "CONFIRMED")).toBe(true);
+  });
+
   it("answers recover on a healthy committed trip with NO_ACTION and zero supplier calls, without charge", async () => {
     const s = await setup();
     const prep = await prepare(s, baseIntent());
