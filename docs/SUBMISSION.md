@@ -47,7 +47,7 @@ What is real and what is not, today:
 | Mainnet routes under `/v1` | live since 2026-09-30. Every paid route answers a Mainnet USDC 402 carrying the challenge tag, or refuses an unknown trip before charging (`check-402 --mainnet` passes all five) |
 | Suppliers | seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit under policy `sandbox-supplier-v1` |
 | Real bookings | none. No production supplier is connected, and the manifests say so in their evidence grade |
-| Algorand anchors | Mainnet anchor account `X6RVK5VDE2KQOEWURVUWGAPNEL5FYFTJXJFODKO55MN3JRX4DBQTPQ4BDQ` funded and published in `/.well-known/intyr-signing-keys.json`. Mainnet records anchor from the first Mainnet paid call. The TestNet anchor is unfunded, so sandbox records verify as `PROOF_PARTIAL` `[OWNER: TestNet dispenser]` |
+| Algorand anchors | enabled on both networks. The Mainnet anchor account `X6RVK5VDE2KQOEWURVUWGAPNEL5FYFTJXJFODKO55MN3JRX4DBQTPQ4BDQ` is funded and published in `/.well-known/intyr-signing-keys.json`. Records created before anchoring was enabled stay unanchored and verify as `PROOF_PARTIAL` |
 | Assurance or guarantees | none. `assurance.mode` is `NONE` in every record |
 
 ## Live endpoint
@@ -102,6 +102,12 @@ component and decision Merkle roots, reads the anchor note from a public Algoran
 listed payment against the USDC transfer on chain. It exits 0 only for `PROOF_VERIFIED`.
 
 ## Evidence
+
+The campaign question, arms, metrics and decision rule were committed to git before any run, in `c14c8b6`
+(`packages/eval/EVAL_CAMPAIGN.md`, SHA-256 `fb6038c8bd37173ff4a4f805c2e577e981a416ce9e1b7322b54fae1be0d6c722`).
+The same hash was anchored on TestNet later, in transaction `WHP6YBEIU3B4QR3RMA2UHO6R2FVHQOJ6PHAAKETTJZPF3GXXWWNA`
+at round 67823189, with note `intyr:prereg:v1:<hash>`. The anchor was sent from the TestNet payer account. The
+git commit is what predates the runs. The anchor proves the committed file wasn't changed after that round.
 
 `evidence/campaign-001/SUMMARY.md` compares a naive sequential agent (B0) with a competent independent
 script (B1) on the seeded simulator: 110 runs each, with an auditor that reads the simulator's own order list.

@@ -88,7 +88,7 @@ before settlement, so a request that would be refused is never charged.
 | Mainnet routes under `/v1` | live. They pay to `EXWYXCAPJ7BUVKANGFMNTALTCTFJNV2AYKB3ERKVVKRXOJJREGQ5NJBKUI` in USDC (ASA 31566704) |
 | Suppliers | a seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit (policy `sandbox-supplier-v1`) |
 | Real bookings | none. No production supplier is connected, and each record states its evidence grade (`SIMULATED`, `CALLER_ASSERTED`, `SUPPLIER_SANDBOX`) |
-| Algorand anchors | the Mainnet anchor account is funded and published, so Mainnet records anchor on chain. The TestNet anchor is unfunded, so sandbox records verify as `PROOF_PARTIAL` |
+| Algorand anchors | enabled on Mainnet and TestNet, from funded anchor accounts published in `/.well-known/intyr-signing-keys.json`. Records created before anchoring was enabled stay unanchored and verify as `PROOF_PARTIAL` |
 | Guarantees | none. Every record carries `assurance.mode: NONE` |
 
 ## How it is built
