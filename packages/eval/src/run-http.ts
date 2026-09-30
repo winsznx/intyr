@@ -31,6 +31,7 @@ async function main(): Promise<void> {
       "max-price-move": { type: "string", default: "10" },
       out: { type: "string" },
       salt: { type: "string", default: "" },
+      "worker-version": { type: "string", default: "unknown" },
     },
   });
   const outDir = resolve(values.out ?? join(here, "../../../evidence", values.campaign));
@@ -133,6 +134,7 @@ async function main(): Promise<void> {
   const manifest = existsSync(manifestPath) ? (JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>) : {};
   manifest.t_arm = {
     base_url: options.baseUrl,
+    worker_version: values["worker-version"],
     limits: options.limits,
     arm_file: "packages/eval/src/arms/t-http.ts",
     arm_sha256: createHash("sha256").update(readFileSync(join(here, "arms/t-http.ts"))).digest("hex"),
