@@ -84,8 +84,8 @@ unknown trip with `charged: false` before they ask for payment.
 | Part | State |
 |---|---|
 | x402 payment ladder, TestNet sandbox, commit saga, reconciler, recovery | running at the live URL |
-| Mainnet routes under `/v1` | built. They go live once the Mainnet payTo address is configured |
-| Suppliers | a seeded fault simulator today. The Duffel (test mode) and LiteAPI (sandbox) adapters are built and wait for their keys |
+| Mainnet routes under `/v1` | live. They pay to `EXWYXCAPJ7BUVKANGFMNTALTCTFJNV2AYKB3ERKVVKRXOJJREGQ5NJBKUI` in USDC (ASA 31566704) |
+| Suppliers | a seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit (policy `sandbox-supplier-v1`) |
 | Real bookings | none. No production supplier is connected, and each record states its evidence grade (`SIMULATED`, `CALLER_ASSERTED`, `SUPPLIER_SANDBOX`) |
 | Algorand anchors | built. Records verify as `PROOF_PARTIAL` until the anchor account is funded |
 | Guarantees | none. Every record carries `assurance.mode: NONE` |

@@ -44,8 +44,8 @@ What is real and what is not, today:
 | Part | Status on 2026-09-30 |
 |---|---|
 | x402 payment ladder (settle before any supplier work, txid persisted, 202 with `payment_state` for an unknown settlement) | running on the TestNet sandbox |
-| Mainnet routes under `/v1` | built, disabled until the owner sets the Mainnet payTo address `[OWNER]` |
-| Suppliers | seeded fault simulator today. Duffel (test mode) and LiteAPI (sandbox) adapters are built and wait for their keys `[OWNER]` |
+| Mainnet routes under `/v1` | live since 2026-09-30. Every paid route answers a Mainnet USDC 402 carrying the challenge tag, or refuses an unknown trip before charging (`check-402 --mainnet` passes all five) |
+| Suppliers | seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit under policy `sandbox-supplier-v1` |
 | Real bookings | none. No production supplier is connected, and the manifests say so in their evidence grade |
 | Algorand anchors | code done, account unfunded, so live manifests verify as `PROOF_PARTIAL` until it is funded `[OWNER]` |
 | Assurance or guarantees | none. `assurance.mode` is `NONE` in every record |
@@ -53,8 +53,8 @@ What is real and what is not, today:
 ## Live endpoint
 
 - Host: https://intyr.timjosh507.workers.dev
+- Mainnet routes: `POST /v1/trips/{check,prepare,revalidate,commit,recover}`
 - TestNet sandbox routes: `POST /sandbox/v1/trips/{check,prepare,revalidate,commit,recover}`
-- Mainnet routes: `POST /v1/trips/{check,prepare,revalidate,commit,recover}` `[OWNER: live once PAY_TO_MAINNET is set]`
 - Discovery: `GET /.well-known/x402` (x402 V2, tag `x402-global-challenge`), `GET /llms.txt`,
   `GET /.well-known/intyr-signing-keys.json`
 
@@ -80,7 +80,9 @@ never presented as adoption.
 
 ## payTo wallet on the leaderboard
 
-- Mainnet: `[OWNER: receive-only address opted in to USDC ASA 31566704]`
+- Mainnet: `EXWYXCAPJ7BUVKANGFMNTALTCTFJNV2AYKB3ERKVVKRXOJJREGQ5NJBKUI`, opted in to USDC (ASA 31566704) in
+  transaction `W3LEVRM2YRLACV2DWAUDAL3XYPGE25SBPLZESAYDT66TRYMAOMGQ`, round 65550070. The same address appears
+  in `/.well-known/x402` and in every Mainnet 402.
 - TestNet sandbox: `ZBSIVWPNE3WGZBUTLNTGXJBBAAEWYVPHYQL2C2CGYFCLXEL2CWMNYTKTXA`
 
 ## Proof of a real Mainnet payment
