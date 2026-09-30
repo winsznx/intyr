@@ -23,9 +23,9 @@ TestNet ALGO comes from https://bank.testnet.algorand.network and TestNet USDC f
 | `requests/check.json` | `POST /trips/check` | A signed commit plan: order `hotel, flight, transfer` (the transfer depends on the flight), per-leg readiness, verdict `COMMIT_NOW` |
 | `requests/check-irreversible.json` | `POST /trips/check` | The same trip with a non-refundable, pay-now flight: verdict `DO_NOT_COMMIT`, outcome `REFUSE`, reason `READINESS_BELOW_THRESHOLD` |
 | `requests/prepare.json` | `POST /trips/prepare` | A trip with a signed Commit Manifest; each leg states its supplier class and evidence grade |
-| `requests/prepare-with-fault.json` | `POST /sandbox/v1/trips/prepare` | A seeded simulator trip where the flight is booked but the response is lost; commit ends `COMMIT_STATUS_UNKNOWN`, then the reconciler reads the supplier and continues instead of rebooking |
+| `requests/prepare-with-fault.json` | `POST /sandbox/v1/trips/prepare` | A seeded simulator trip where the flight is booked but the response is lost. Commit returns `202` with the flight `COMMIT_STATUS_UNKNOWN` and does not rebook it. Resolving that state is the scheduled reconciler's job; on 2026-09-30 the live deploy did not yet advance it (tracked as a known issue) |
 
-Both check results above were produced by the live sandbox on 2026-09-30. Scenarios (`scenario`) are accepted on
+All four results above were produced by the live sandbox on 2026-09-30. Scenarios (`scenario`) are accepted on
 the sandbox host only.
 
 ## Without a wallet
