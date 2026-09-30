@@ -1,0 +1,11 @@
+{
+  "trip_ref": "nyc-client-visit",
+  "currency": "USD",
+  "budget_total_minor": 150000,
+  "components": [
+    { "type": "FLIGHT", "origin": "LHR", "destination": "JFK", "depart_date": "2026-11-12", "passengers": 1 },
+    { "type": "HOTEL", "city": "New York", "check_in": "2026-11-12", "check_out": "2026-11-15", "guests": 1 },
+    { "type": "GROUND", "from": "JFK", "to": "Midtown Manhattan", "pickup_at": "2026-11-12T15:00:00Z", "passengers": 1 }
+  ],
+  "limits": { "max_total_minor": 150000, "max_price_move_pct": 5 }
+}

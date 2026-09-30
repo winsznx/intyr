@@ -1,0 +1,11 @@
+{
+  "trip_ref": "sandbox-lost-response",
+  "currency": "USD",
+  "budget_total_minor": 150000,
+  "components": [
+    { "type": "FLIGHT", "origin": "LHR", "destination": "JFK", "depart_date": "2026-11-12", "passengers": 1 },
+    { "type": "HOTEL", "city": "New York", "check_in": "2026-11-12", "check_out": "2026-11-15", "guests": 1 }
+  ],
+  "limits": { "max_total_minor": 150000, "min_readiness": 30 },
+  "scenario": { "seed": 424242, "faults": [ { "component_index": 0, "fault": "TIMEOUT_BOOKED" }, { "component_index": 1, "fault": "HAPPY" } ] }
+}

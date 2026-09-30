@@ -1,0 +1,68 @@
+{
+  "trip_ref": "lisbon-offsite",
+  "currency": "USD",
+  "legs": [
+    {
+      "leg_id": "flight",
+      "type": "FLIGHT",
+      "supplier": "duffel",
+      "offer_ref": "off_0000AbCdEfGhIjKlMnOpQr",
+      "price": {
+        "amount_minor": 41250,
+        "currency": "USD"
+      },
+      "preparation_mode": "HARD_HOLD",
+      "refundable": true,
+      "clocks": {
+        "price_valid_until": "2026-12-01T10:30:00Z",
+        "inventory_held_until": "2026-12-02T10:30:00Z",
+        "void_until": "2026-12-03T10:30:00Z",
+        "refund_destination": "CASH",
+        "confirmation_mode": "INSTANT"
+      }
+    },
+    {
+      "leg_id": "hotel",
+      "type": "HOTEL",
+      "supplier": "liteapi",
+      "offer_ref": "prebook_7hQ2",
+      "price": {
+        "amount_minor": 38400,
+        "currency": "USD"
+      },
+      "preparation_mode": "REVALIDATED",
+      "refundable": true,
+      "clocks": {
+        "free_cancel_until": "2026-12-10T00:00:00Z",
+        "refund_destination": "CASH",
+        "confirmation_mode": "INSTANT",
+        "price_valid_until": "2026-12-01T10:30:00Z"
+      }
+    },
+    {
+      "leg_id": "transfer",
+      "type": "GROUND",
+      "supplier": "transferz",
+      "offer_ref": "quote_91x",
+      "price": {
+        "amount_minor": 5200,
+        "currency": "USD"
+      },
+      "preparation_mode": "REVALIDATED",
+      "refundable": true,
+      "depends_on": [
+        "flight"
+      ],
+      "clocks": {
+        "free_cancel_until": "2026-12-11T12:00:00Z",
+        "refund_destination": "CASH",
+        "confirmation_mode": "ASYNC",
+        "price_valid_until": "2026-12-01T10:30:00Z"
+      }
+    }
+  ],
+  "limits": {
+    "max_total_minor": 90000,
+    "max_irreversible_minor": 45000
+  }
+}
