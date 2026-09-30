@@ -194,6 +194,7 @@ describe("payment ladder", () => {
     expect(body.status).toBe("PAYMENT_PENDING");
     expect(body.payment_state).toBe("UNKNOWN");
     expect(body.payment_txid).toBe(built.txid);
+    expect(body.poll_url).toBe(`${URL_}/sandbox/v1/payments/${body.payment_session_id}`);
     expect(h.handlerCalls.n).toBe(0);
 
     // The money did land. The node now shows it, and replaying the same proof runs the work once.

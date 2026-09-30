@@ -6,7 +6,7 @@ import {
 } from "@x402/core/http";
 import type { x402HTTPResourceServer } from "@x402/core/server";
 import { canonicalize, hashValue } from "@intyr/core";
-import type { NetworkConfig } from "../config";
+import { routePrefix, type NetworkConfig } from "../config";
 import { decodeAvmPayment, PaymentDecodeError, type DecodedPayment } from "./decode";
 import { readPaymentTx, type ChainReading } from "./chain";
 import {
@@ -90,8 +90,8 @@ function envelope(session: PaymentSession | null, net: NetworkConfig, extra: Rec
   };
 }
 
-function pollUrl(origin: string, session: PaymentSession): string {
-  return `${origin}/v1/payments/${session.id}`;
+function pollUrl(origin: string, net: NetworkConfig, session: PaymentSession): string {
+  return `${origin}${routePrefix(net.name)}/payments/${session.id}`;
 }
 
 /**
@@ -168,7 +168,7 @@ export function createLadder(deps: LadderDeps) {
     if (!created && operation.status !== "PENDING") return replayOperation(c, session, operation, settlementHeaders);
     if (!created && operation.status === "PENDING" && Date.parse(at) - Date.parse(operation.updated_at) < 30_000) {
       return c.json(
-        envelope(session, deps.net, { operation_id: operation.id, status: "PROCESSING", poll_url: `${new URL(c.req.url).origin}/v1/operations/${operation.id}` }),
+        envelope(session, deps.net, { operation_id: operation.id, status: "PROCESSING", poll_url: `${new URL(c.req.url).origin}${routePrefix(deps.net.name)}/operations/${operation.id}` }),
         202,
       );
     }
@@ -284,7 +284,7 @@ export function createLadder(deps: LadderDeps) {
         if (resolved === "EXPIRED_UNSETTLED" || resolved === "SETTLE_FAILED") {
           return c.json(envelope(session, deps.net, { error: "PAYMENT_NOT_SETTLED", message: "The payment never reached the ledger. No work was done and nothing was charged.", charged: false }), 402);
         }
-        return c.json(envelope(session, deps.net, { status: "PAYMENT_PENDING", poll_url: pollUrl(origin, session), message: "Settlement status is unknown. Do not pay again; poll this URL." }), 202);
+        return c.json(envelope(session, deps.net, { status: "PAYMENT_PENDING", poll_url: pollUrl(origin, deps.net, session), message: "Settlement status is unknown. Do not pay again; poll this URL." }), 202);
       }
       return c.json(envelope(session, deps.net, { error: "PAYMENT_NOT_USABLE", message: `payment session is ${session.state}` }), 402);
     }
@@ -353,7 +353,7 @@ export function createLadder(deps: LadderDeps) {
       return c.json(envelope(latest, deps.net, { error: "PAYMENT_NOT_SETTLED", message: "The payment never reached the ledger. Nothing was charged.", charged: false }), 402);
     }
     // Never a 402 here: the caller may already have paid, and a 402 invites a second payment.
-    return c.json(envelope(latest, deps.net, { status: "PAYMENT_PENDING", poll_url: pollUrl(origin, latest), message: "Settlement status is unknown. Do not pay again; poll this URL." }), 202);
+    return c.json(envelope(latest, deps.net, { status: "PAYMENT_PENDING", poll_url: pollUrl(origin, deps.net, latest), message: "Settlement status is unknown. Do not pay again; poll this URL." }), 202);
   }
 
   async function runHandlerWithKnownSettlement(
@@ -371,7 +371,7 @@ export function createLadder(deps: LadderDeps) {
         return c.json(
           envelope(session, deps.net, {
             status: "PAYMENT_CONFIRMATION_PENDING",
-            poll_url: pollUrl(new URL(c.req.url).origin, session),
+            poll_url: pollUrl(new URL(c.req.url).origin, deps.net, session),
             message: "The payment settled but our own ledger read has not confirmed it yet. Replay the same request with the same proof.",
           }),
           202,
