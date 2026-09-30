@@ -216,8 +216,7 @@ before the hotel here.
 
 ## Repository
 
-https://github.com/winsznx/intyr (public). License: `[OWNER: package.json says MIT, LICENSE file not added
-yet]`.
+https://github.com/winsznx/intyr (public, MIT licensed).
 
 Electric Capital registration: pull request https://github.com/electric-capital/open-dev-data/pull/3079 adds
 `repadd Algorand https://github.com/winsznx/intyr #protocol` under the Algorand ecosystem. The steps are in

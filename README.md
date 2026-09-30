@@ -169,4 +169,5 @@ Node 22 or newer and pnpm 11.
 
 ## License
 
-MIT is declared in `package.json`. A LICENSE file will be added once the owner confirms the choice.
+MIT, see [LICENSE](LICENSE). Security reports go through the process in [SECURITY.md](SECURITY.md), and
+[CONTRIBUTING.md](CONTRIBUTING.md) covers setup and conventions.
