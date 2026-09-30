@@ -143,6 +143,58 @@ describe("submitNoteTransaction", () => {
   });
 });
 
+describe("failover to the second public node", () => {
+  const NET_FB = { ...NET, fallback: { algodUrl: "https://algod-b.test", indexerUrl: "https://indexer-b.test" } };
+
+  function recording(routes: Record<string, Route>): FetchLike & { urls: string[]; bodies: Uint8Array[] } {
+    const urls: string[] = [];
+    const bodies: Uint8Array[] = [];
+    const fn = async (url: string, init?: RequestInit) => {
+      urls.push(url);
+      if (init?.body instanceof Uint8Array) bodies.push(init.body);
+      const route = routes[`${init?.method ?? "GET"} ${url}`];
+      return route ? route(init) : json({ message: "not found" }, 404);
+    };
+    return Object.assign(fn, { urls, bodies });
+  }
+
+  it("reads from the fallback when the primary answers with a quota refusal", async () => {
+    // #given a primary node that has run out of free quota for this caller
+    const fetchFn = recording({
+      [`GET https://algod.test/v2/transactions/pending/${TXID}`]: () => json({ message: "Daily free API quota exceeded" }, 403),
+      [`GET https://algod-b.test/v2/transactions/pending/${TXID}`]: () => json({ "confirmed-round": 5003 }),
+    });
+
+    // #then the lookup is answered by the other domain
+    expect(await lookupTransaction(NET_FB, TXID, fetchFn)).toEqual({ state: "CONFIRMED", round: 5003, source: "algod" });
+  });
+
+  it("takes a 404 from the primary as an answer, not an outage", async () => {
+    const fetchFn = recording({ "GET https://algod.test/v2/status": () => json({ "last-round": 5200 }) });
+    await lookupTransaction(NET_FB, TXID, fetchFn);
+    expect(fetchFn.urls.filter((u) => u.includes("-b.test"))).toEqual([]);
+  });
+
+  it("resends the identical signed bytes to the fallback when the primary refuses on quota", async () => {
+    const fetchFn = recording({
+      ...PARAMS,
+      "POST https://algod.test/v2/transactions": () => json({ message: "quota" }, 429),
+      "POST https://algod-b.test/v2/transactions": () => json({ txId: "ok" }),
+    });
+    const result = await submitNoteTransaction(NET_FB, { mnemonic: MNEMONIC }, "intyr:test", { fetch: fetchFn });
+    expect([result.state, fetchFn.bodies.length, fetchFn.bodies[0]?.join() === fetchFn.bodies[1]?.join()]).toEqual([
+      "ACCEPTED",
+      2,
+      true,
+    ]);
+  });
+
+  it("reports a quota refusal on submit as UNKNOWN, since the node never judged the transaction", async () => {
+    const fetchFn = fakeFetch({ ...PARAMS, "POST https://algod.test/v2/transactions": () => json({ message: "quota" }, 403) });
+    expect((await submitNoteTransaction(NET, { mnemonic: MNEMONIC }, "intyr:test", { fetch: fetchFn })).state).toBe("UNKNOWN");
+  });
+});
+
 describe("lookupTransaction", () => {
   it("reads confirmation from the node's pending pool first", async () => {
     const fetchFn = fakeFetch({ [`GET https://algod.test/v2/transactions/pending/${TXID}`]: () => json({ "confirmed-round": 5003 }) });

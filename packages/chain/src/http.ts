@@ -1,4 +1,36 @@
+import type { ChainEndpoints } from "./networks";
+
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+/** A node answer that means "not now" rather than "no": a quota, a rate limit or a server fault. */
+export function isUnavailable(status: number): boolean {
+  return status === 401 || status === 403 || status === 429 || status >= 500;
+}
+
+/**
+ * Sends a request that fails for availability reasons once more to the
+ * fallback node. Free public tiers meter per egress address, which a Worker
+ * shares with other tenants. Resending the same signed transaction bytes is
+ * safe because Algorand accepts a txid only once.
+ */
+export function failoverFetch(net: ChainEndpoints, fetchFn: FetchLike): FetchLike {
+  const fallback = net.fallback;
+  if (!fallback) return fetchFn;
+  const alternate = (url: string): string | null => {
+    if (url.startsWith(net.algodUrl)) return fallback.algodUrl + url.slice(net.algodUrl.length);
+    if (url.startsWith(net.indexerUrl)) return fallback.indexerUrl + url.slice(net.indexerUrl.length);
+    return null;
+  };
+  return async (url, init) => {
+    const other = alternate(url);
+    if (!other) return fetchFn(url, init);
+    const primary = await fetchFn(url, init).then(
+      (res) => (isUnavailable(res.status) ? null : res),
+      () => null,
+    );
+    return primary ?? fetchFn(other, init);
+  };
+}
 
 export type JsonResponse =
   | { kind: "ok"; body: unknown }

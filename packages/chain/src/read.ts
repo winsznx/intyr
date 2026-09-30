@@ -1,5 +1,5 @@
 import algosdk from "algosdk";
-import { asNumber, asRecord, base64ToBytes, getJson, type FetchLike } from "./http";
+import { asNumber, asRecord, base64ToBytes, failoverFetch, getJson, type FetchLike } from "./http";
 import type { ChainEndpoints } from "./networks";
 import { manifestAnchorNote } from "./note";
 
@@ -20,6 +20,10 @@ async function currentRound(net: ChainEndpoints, fetchFn: FetchLike): Promise<nu
 
 /** Confirmation state of a txid: the node's pending pool first (no indexing lag), then the indexer. */
 export async function lookupTransaction(net: ChainEndpoints, txid: string, fetchFn: FetchLike = fetch): Promise<TxLookup> {
+  return lookupWith(net, txid, failoverFetch(net, fetchFn));
+}
+
+async function lookupWith(net: ChainEndpoints, txid: string, fetchFn: FetchLike): Promise<TxLookup> {
   const pending = await getJson(fetchFn, `${net.algodUrl}/v2/transactions/pending/${encodeURIComponent(txid)}`);
   if (pending.kind === "ok") {
     const body = asRecord(pending.body);
@@ -93,6 +97,10 @@ function parseIndexed(txid: string, raw: Record<string, unknown>): IndexedTransa
 
 /** Reads a confirmed transaction from the indexer, the public record anyone can query without Intyr. */
 export async function readIndexedTransaction(net: ChainEndpoints, txid: string, fetchFn: FetchLike = fetch): Promise<IndexedRead> {
+  return readIndexedWith(net, txid, failoverFetch(net, fetchFn));
+}
+
+async function readIndexedWith(net: ChainEndpoints, txid: string, fetchFn: FetchLike): Promise<IndexedRead> {
   const res = await getJson(fetchFn, `${net.indexerUrl}/v2/transactions/${encodeURIComponent(txid)}`);
   if (res.kind === "not_found") return { state: "NOT_FOUND" };
   if (res.kind === "error") return { state: "UNAVAILABLE", reason: res.reason };
@@ -120,11 +128,11 @@ export async function checkManifestAnchor(
   manifestHash: string,
   options: { anchorAddress?: string; fetch?: FetchLike } = {},
 ): Promise<AnchorCheck> {
-  const fetchFn = options.fetch ?? fetch;
-  const read = await readIndexedTransaction(net, txid, fetchFn);
+  const fetchFn = failoverFetch(net, options.fetch ?? fetch);
+  const read = await readIndexedWith(net, txid, fetchFn);
   if (read.state === "UNAVAILABLE") return { state: "INDEXER_UNAVAILABLE", reason: read.reason };
   if (read.state === "NOT_FOUND") {
-    const lookup = await lookupTransaction(net, txid, fetchFn);
+    const lookup = await lookupWith(net, txid, fetchFn);
     return lookup.state === "PENDING" || lookup.state === "CONFIRMED" ? { state: "ANCHOR_UNCONFIRMED", txid } : { state: "ANCHOR_NOT_FOUND", txid };
   }
   const { tx } = read;
@@ -159,7 +167,11 @@ function algodAddress(b64: unknown): string | null {
 
 /** Reads an ASA transfer by txid: indexer first, then the node's pending pool to cover indexing lag. */
 export async function readAssetTransfer(net: ChainEndpoints, txid: string, fetchFn: FetchLike = fetch): Promise<AssetTransferRead> {
-  const indexed = await readIndexedTransaction(net, txid, fetchFn);
+  return readAssetTransferWith(net, txid, failoverFetch(net, fetchFn));
+}
+
+async function readAssetTransferWith(net: ChainEndpoints, txid: string, fetchFn: FetchLike): Promise<AssetTransferRead> {
+  const indexed = await readIndexedWith(net, txid, fetchFn);
   if (indexed.state === "FOUND") {
     const { tx } = indexed;
     if (!tx.assetTransfer) return { state: "NOT_A_TRANSFER", txType: tx.txType };

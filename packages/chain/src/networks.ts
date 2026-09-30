@@ -4,6 +4,8 @@ export type NetworkName = "mainnet" | "testnet";
 export interface ChainEndpoints {
   algodUrl: string;
   indexerUrl: string;
+  /** Second public domain of the same operator, tried once when the primary is unavailable. */
+  fallback?: { algodUrl: string; indexerUrl: string };
 }
 
 export interface AlgorandNetwork extends ChainEndpoints {
@@ -26,6 +28,7 @@ export const NETWORKS: Readonly<Record<NetworkName, AlgorandNetwork>> = {
     usdcAssetId: 31566704,
     algodUrl: "https://mainnet-api.4160.nodely.dev",
     indexerUrl: "https://mainnet-idx.4160.nodely.dev",
+    fallback: { algodUrl: "https://mainnet-api.algonode.cloud", indexerUrl: "https://mainnet-idx.algonode.cloud" },
     explorerTxBase: "https://allo.info/tx/",
   },
   testnet: {
@@ -36,6 +39,7 @@ export const NETWORKS: Readonly<Record<NetworkName, AlgorandNetwork>> = {
     usdcAssetId: 10458941,
     algodUrl: "https://testnet-api.4160.nodely.dev",
     indexerUrl: "https://testnet-idx.4160.nodely.dev",
+    fallback: { algodUrl: "https://testnet-api.algonode.cloud", indexerUrl: "https://testnet-idx.algonode.cloud" },
     explorerTxBase: "https://testnet.allo.info/tx/",
   },
 };

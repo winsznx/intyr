@@ -1,5 +1,5 @@
 import algosdk from "algosdk";
-import { asNumber, asRecord, base64ToBytes, getJson, type FetchLike } from "./http";
+import { asNumber, asRecord, base64ToBytes, failoverFetch, getJson, type FetchLike } from "./http";
 import type { ChainEndpoints } from "./networks";
 import { MAX_NOTE_BYTES } from "./note";
 
@@ -69,7 +69,7 @@ export async function prepareNoteTransaction(
   const noteBytes = new TextEncoder().encode(note);
   if (noteBytes.length > MAX_NOTE_BYTES) throw new RangeError(`note is ${noteBytes.length} bytes, the limit is ${MAX_NOTE_BYTES}`);
   const account = algosdk.mnemonicToSecretKey(signer.mnemonic);
-  const params = await nodeParams(net, options.fetch ?? fetch);
+  const params = await nodeParams(net, failoverFetch(net, options.fetch ?? fetch));
   const firstValid = params.lastRound;
   const lastValid = params.lastRound + (options.validRounds ?? 100);
   const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
@@ -104,7 +104,7 @@ export async function sendPreparedTransaction(
   options: Pick<NoteOptions, "fetch"> = {},
 ): Promise<SubmitResult> {
   const { signed, ...ref } = prepared;
-  const fetchFn = options.fetch ?? fetch;
+  const fetchFn = failoverFetch(net, options.fetch ?? fetch);
   let res: Response;
   try {
     res = await fetchFn(`${net.algodUrl}/v2/transactions`, {
@@ -117,7 +117,8 @@ export async function sendPreparedTransaction(
   }
   if (res.ok) return { state: "ACCEPTED", ...ref };
   const detail = (await res.text().catch(() => "")).slice(0, 300);
-  if (res.status >= 400 && res.status < 500) return { state: "REJECTED", status: res.status, reason: detail, ...ref };
+  // Only a 400 is algod judging the transaction. A quota, rate limit or server fault never looked at it.
+  if (res.status === 400) return { state: "REJECTED", status: res.status, reason: detail, ...ref };
   return { state: "UNKNOWN", reason: `algod answered ${res.status}: ${detail}`, ...ref };
 }
 
