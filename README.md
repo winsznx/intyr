@@ -89,7 +89,7 @@ before settlement, so a request that would be refused is never charged.
 | Part | State |
 |---|---|
 | x402 payment ladder, TestNet sandbox, commit saga, reconciler, recovery | running at the live URL |
-| Mainnet routes under `/v1` | live. They pay to `EXWYXCAPJ7BUVKANGFMNTALTCTFJNV2AYKB3ERKVVKRXOJJREGQ5NJBKUI` in USDC (ASA 31566704) |
+| Mainnet routes under `/v1` | live. They pay to `EXWYXCAPJ7BUVKANGFMNTALTCTFJNV2AYKB3ERKVVKRXOJJREGQ5NJBKUI` in USDC (ASA 31566704). The first settled payment, `2MD7RMXD...LNLVPA`, was team-paid (`INTERNAL_VALIDATION`). It bought plan `pln_357c45b828fabcb25b5e271e`, which verifies `PROOF_VERIFIED` against its Mainnet anchor |
 | Suppliers | a seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit (policy `sandbox-supplier-v1`) |
 | Real bookings | none. No production supplier is connected, and each record states its evidence grade (`SIMULATED`, `CALLER_ASSERTED`, `SUPPLIER_SANDBOX`) |
 | Algorand anchors | enabled on Mainnet and TestNet, from funded anchor accounts published in `/.well-known/intyr-signing-keys.json`. Records created before anchoring was enabled stay unanchored and verify as `PROOF_PARTIAL` |

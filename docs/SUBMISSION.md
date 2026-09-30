@@ -87,8 +87,20 @@ never presented as adoption.
 
 ## Proof of a real Mainnet payment
 
-`[OWNER: RUN-001 payment txid and explorer link, after the Mainnet payTo and payer are funded. Label it
-team-controlled if the team paid it.]`
+RUN-001, on 2026-10-01, was a team-controlled payment, labeled `INTERNAL_VALIDATION` and not adoption:
+
+- Payment: `2MD7RMXDHTLVE76ZNTAOZKZCYEPLF7AIBBOAGZQEO6JOFQLNLVPA`, round 65551497. It moved 0.10 USDC
+  (ASA 31566704) from the team payer `HHHWQXWFW3S5MMYJXRCA4Y6XTMM4ESR26TYP3HHWXX27AUFUZCYEXK7OZQ` to the payTo,
+  settled through the GoPlausible facilitator as a fee-paid atomic group.
+  https://allo.info/tx/2MD7RMXDHTLVE76ZNTAOZKZCYEPLF7AIBBOAGZQEO6JOFQLNLVPA
+- What it bought: a signed commit plan from `POST /v1/trips/check`, `pln_357c45b828fabcb25b5e271e`, payload
+  hash `sha256:0cab926c4c011c0cef69089057c7362d47468c682cce4d94a02a415c63942ac0`.
+- Anchor: `H5MV4IAUFZNDYW6YPUSQP7YVANXLRDOUXFCDTNOEBX6LD5DITGCQ`, round 65551499, two rounds after the
+  payment. It was sent by the published Mainnet anchor account, with note `intyr:v1:<payload hash>`.
+  https://allo.info/tx/H5MV4IAUFZNDYW6YPUSQP7YVANXLRDOUXFCDTNOEBX6LD5DITGCQ
+
+Check it without trusting Intyr's server: `pnpm --filter @intyr/verifier verify pln_357c45b828fabcb25b5e271e`
+returns `PROOF_VERIFIED`. The payment itself can be read from any Algorand indexer at the txid above.
 
 ## How to check a record yourself
 
