@@ -11,7 +11,8 @@ export interface ServiceDeps {
   allowScenario: boolean;
   now: () => Date;
   /** Records a manifest hash on chain. Returns null when anchoring is not configured. */
-  anchor?: (manifestId: string, manifestHash: string) => Promise<(AnchorRef & { state?: string }) | null>;
+  /** `wait: false` submits the anchor and returns at once, leaving it for the cron to confirm. The final receipt waits. */
+  anchor?: (manifestId: string, manifestHash: string, opts?: { wait: boolean }) => Promise<(AnchorRef & { state?: string }) | null>;
 }
 
 /** Hash-chained decision log for one trip. Every gate decision is stored before its effect is applied. */
