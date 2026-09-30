@@ -47,7 +47,7 @@ What is real and what is not, today:
 | Mainnet routes under `/v1` | live since 2026-09-30. Every paid route answers a Mainnet USDC 402 carrying the challenge tag, or refuses an unknown trip before charging (`check-402 --mainnet` passes all five) |
 | Suppliers | seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit under policy `sandbox-supplier-v1` |
 | Real bookings | none. No production supplier is connected, and the manifests say so in their evidence grade |
-| Algorand anchors | code done, account unfunded, so live manifests verify as `PROOF_PARTIAL` until it is funded `[OWNER]` |
+| Algorand anchors | Mainnet anchor account `X6RVK5VDE2KQOEWURVUWGAPNEL5FYFTJXJFODKO55MN3JRX4DBQTPQ4BDQ` funded and published in `/.well-known/intyr-signing-keys.json`. Mainnet records anchor from the first Mainnet paid call. The TestNet anchor is unfunded, so sandbox records verify as `PROOF_PARTIAL` `[OWNER: TestNet dispenser]` |
 | Assurance or guarantees | none. `assurance.mode` is `NONE` in every record |
 
 ## Live endpoint
