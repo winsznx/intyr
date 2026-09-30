@@ -1,0 +1,26 @@
+{
+  "name": "@intyr/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "dev": "wrangler dev",
+    "bundle:check": "wrangler deploy --dry-run --outdir dist",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@intyr/core": "workspace:*",
+    "@x402/avm": "2.28.0",
+    "@x402/core": "2.28.0",
+    "@x402/extensions": "2.28.0",
+    "@x402/hono": "2.28.0",
+    "algosdk": "3.8.0",
+    "hono": "^4.9.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260101.0",
+    "wrangler": "^4.119.0"
+  }
+}
