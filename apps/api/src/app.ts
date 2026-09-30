@@ -116,6 +116,60 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         updated_at: s.updated_at,
       });
     });
+    if (prefix === "/v1") {
+      // Trip ids are unguessable and trip documents carry no personal data, so a read by id is public.
+      app.get("/v1/trips/:id", async (c) => {
+        const trip = await store.getTrip(c.req.param("id"));
+        if (!trip || trip.network !== n.net.name) return c.json({ error: "NOT_FOUND" }, 404);
+        return c.json({
+          trip_id: trip.id,
+          state: trip.state,
+          version: trip.version,
+          created_at: trip.created_at,
+          updated_at: trip.updated_at,
+          ...JSON.parse(trip.doc_json),
+          decisions: await store.listDecisions(trip.id),
+        });
+      });
+    }
+    app.get(`${prefix}/stats/public`, async (c) => {
+      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const all = await db
+        .prepare(
+          `SELECT COUNT(*) AS paid_calls, COALESCE(SUM(CAST(amount AS INTEGER)),0) AS atomic, COUNT(DISTINCT payer) AS payers
+           FROM payment_sessions WHERE network = ?1 AND state IN ('SETTLED','CONFIRMED','RECONCILED')`,
+        )
+        .bind(n.net.caip2)
+        .first<{ paid_calls: number; atomic: number; payers: number }>();
+      const byClass = await db
+        .prepare(
+          `SELECT payer_class, COUNT(*) AS calls, COUNT(DISTINCT payer) AS payers, COALESCE(SUM(CAST(amount AS INTEGER)),0) AS atomic
+           FROM payment_sessions WHERE network = ?1 AND state IN ('SETTLED','CONFIRMED','RECONCILED') GROUP BY payer_class`,
+        )
+        .bind(n.net.caip2)
+        .all<{ payer_class: string; calls: number; payers: number; atomic: number }>();
+      const repeat = await db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM (SELECT payer FROM payment_sessions WHERE network = ?1 AND state IN ('SETTLED','CONFIRMED','RECONCILED') GROUP BY payer HAVING COUNT(*) >= 2)`,
+        )
+        .bind(n.net.caip2)
+        .first<{ n: number }>();
+      const recent = await db
+        .prepare(`SELECT COUNT(*) AS n FROM payment_sessions WHERE network = ?1 AND state IN ('SETTLED','CONFIRMED','RECONCILED') AND created_at >= ?2`)
+        .bind(n.net.caip2, since)
+        .first<{ n: number }>();
+      return c.json({
+        environment: n.net.name.toUpperCase(),
+        pay_to: n.payTo,
+        paid_calls: all?.paid_calls ?? 0,
+        usdc_settled: atomicToUsdc(String(all?.atomic ?? 0)),
+        distinct_payers: all?.payers ?? 0,
+        repeat_payers: repeat?.n ?? 0,
+        paid_calls_24h: recent?.n ?? 0,
+        by_payer_class: (byClass.results ?? []).map((r) => ({ payer_class: r.payer_class, paid_calls: r.calls, distinct_payers: r.payers, usdc: atomicToUsdc(String(r.atomic)) })),
+        note: "Payer classes: EXTERNAL_ANON and EXTERNAL_ORG are payers the team does not control. INTERNAL_VALIDATION is team-controlled and is never counted as adoption.",
+      });
+    });
     app.get(`${prefix}/manifests/:id`, async (c) => {
       const row = await store.getManifest(c.req.param("id"));
       if (!row || row.network !== n.net.name) return c.json({ error: "NOT_FOUND" }, 404);

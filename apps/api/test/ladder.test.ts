@@ -284,3 +284,15 @@ describe("unbuilt routes", () => {
     expect(res.headers.get("payment-required")).toBeNull();
   });
 });
+
+describe("public stats and trips", () => {
+  it("reports settled calls and payer classes without counting unsettled payments", async () => {
+    await pay("/sandbox/v1/trips/check", { legs: [1] });
+    const res = await h.app.request(URL_ + "/sandbox/v1/stats/public");
+    const stats = (await res.json()) as { paid_calls: number; usdc_settled: string; distinct_payers: number; repeat_payers: number };
+    expect(stats.paid_calls).toBe(1);
+    expect(stats.usdc_settled).toBe("0.1");
+    expect(stats.distinct_payers).toBe(1);
+    expect(stats.repeat_payers).toBe(0);
+  });
+});
