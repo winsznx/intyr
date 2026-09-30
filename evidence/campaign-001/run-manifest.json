@@ -1,7 +1,7 @@
 {
   "campaign": "campaign-001",
   "environment": "in-process seeded simulator (SIMULATED suppliers)",
-  "git_sha": "773831dcfadbbf8eeb5a501cbdae0931047b95af",
+  "git_sha": "93e23703357ecc58edf5ae7e904f4ce1d0b8a0de",
   "node": "v24.19.0",
   "arms": {
     "B0": {

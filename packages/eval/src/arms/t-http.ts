@@ -94,13 +94,19 @@ export class IntyrHttpClient {
     return { cookie: setCookie.split(";")[0]!, calls: 0 };
   }
 
+  /**
+   * GETs are retried on network errors because they change nothing. A POST that
+   * fails on the network is not retried: the arm cannot know whether it reached
+   * the Worker, so the harness records the run as a harness error instead.
+   */
   async request<T>(session: HttpSession, method: "GET" | "POST", path: string, body?: unknown): Promise<{ status: number; body: T }> {
     session.calls += 1;
-    const res = await this.fetchImpl(`${this.options.baseUrl}${path}`, {
+    const init: RequestInit = {
       method,
       headers: { cookie: session.cookie, ...(body === undefined ? {} : { "content-type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    };
+    const res = method === "GET" ? await this.withRetry(() => this.fetchImpl(`${this.options.baseUrl}${path}`, init)) : await this.fetchImpl(`${this.options.baseUrl}${path}`, init);
     const text = await res.text();
     let parsed: unknown = null;
     try {
@@ -111,8 +117,19 @@ export class IntyrHttpClient {
     return { status: res.status, body: parsed as T };
   }
 
+  private async withRetry(call: () => Promise<Response>, attempts = 5): Promise<Response> {
+    for (let i = 1; ; i++) {
+      try {
+        return await call();
+      } catch (err) {
+        if (i >= attempts) throw err;
+        await sleep(2 * i);
+      }
+    }
+  }
+
   async simOrders(seed: number): Promise<SimOrder[]> {
-    const res = await this.fetchImpl(`${this.options.baseUrl}/sandbox/v1/evidence/sim/${seed}/orders`);
+    const res = await this.withRetry(() => this.fetchImpl(`${this.options.baseUrl}/sandbox/v1/evidence/sim/${seed}/orders`));
     if (!res.ok) throw new Error(`evidence read failed: ${res.status}`);
     const body = (await res.json()) as { orders?: SimOrder[] };
     return body.orders ?? [];

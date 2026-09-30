@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -30,6 +30,7 @@ async function main(): Promise<void> {
       "min-readiness": { type: "string", default: "30" },
       "max-price-move": { type: "string", default: "10" },
       out: { type: "string" },
+      salt: { type: "string", default: "" },
     },
   });
   const outDir = resolve(values.out ?? join(here, "../../../evidence", values.campaign));
@@ -43,8 +44,23 @@ async function main(): Promise<void> {
   const cells = CELLS.filter((c) => !wanted || wanted.has(c.id));
   const repeats = Number.parseInt(values.repeats, 10);
 
-  const records: RunRecord[] = [];
-  const transcripts: unknown[] = [];
+  // Results are appended per trip so an interrupted run resumes where it stopped.
+  const resultsPath = join(outDir, "t-results.jsonl");
+  const transcriptsPath = join(outDir, "t-transcripts.jsonl");
+  const harnessErrorsPath = join(outDir, "t-harness-errors.jsonl");
+  const records: RunRecord[] = existsSync(resultsPath)
+    ? readFileSync(resultsPath, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as RunRecord)
+    : [];
+  const done = new Set(records.map((r) => `${r.cell}|${r.shape}|${r.repeat}`));
+  // A trip that hit a harness fault may have left simulator orders behind, so its rerun gets a fresh seed.
+  const priorFaults = new Map<string, number>();
+  if (existsSync(harnessErrorsPath)) {
+    for (const line of readFileSync(harnessErrorsPath, "utf8").split("\n").filter(Boolean)) {
+      const e = JSON.parse(line) as { cell: string; shape: string; repeat: number };
+      const key = `${e.cell}|${e.shape}|${e.repeat}`;
+      priorFaults.set(key, (priorFaults.get(key) ?? 0) + 1);
+    }
+  }
   let session: HttpSession | null = null;
   let tripsInSession = 0;
   for (const cell of cells) {
@@ -54,15 +70,31 @@ async function main(): Promise<void> {
           session = await client.openSession();
           tripsInSession = 0;
         }
+        if (done.has(`${cell.id}|${shape.id}|${repeat}`)) continue;
         tripsInSession += 1;
-        const trip = tripFor(cell, shape, repeat, values.campaign);
+        const base = tripFor(cell, shape, repeat, values.campaign);
+        // The Worker's simulator is shared by every caller; a salt keeps this run's seeds unused.
+        const attempt = priorFaults.get(`${cell.id}|${shape.id}|${repeat}`) ?? 0;
+        const seed = `${values.salt ? `${values.salt}|` : ""}${base.seed}${attempt ? `#${attempt}` : ""}`;
+        const trip = seed === base.seed ? base : { ...base, seed };
         const started = Date.now();
-        const { report, trip_id, transcript } = await runT(trip, client, session, options);
-        // Let asynchronous simulator orders settle before the auditor reads them.
-        await new Promise((r) => setTimeout(r, 5000));
-        const orders = await client.simOrders(numericSeed(trip.seed));
+        let outcome: Awaited<ReturnType<typeof runT>>;
+        let orders: Awaited<ReturnType<IntyrHttpClient["simOrders"]>>;
+        try {
+          outcome = await runT(trip, client, session, options);
+          // Let asynchronous simulator orders settle before the auditor reads them.
+          await new Promise((r) => setTimeout(r, 5000));
+          orders = await client.simOrders(numericSeed(trip.seed));
+        } catch (err) {
+          // A harness fault (network, not the product) is logged and the trip is rerun later with a fresh seed.
+          appendFileSync(harnessErrorsPath, JSON.stringify({ cell: cell.id, shape: shape.id, repeat, seed: trip.seed, error: err instanceof Error ? err.message : String(err), at: new Date().toISOString() }) + "\n");
+          console.log(`${cell.id} ${shape.id} r${repeat}: HARNESS_ERROR ${err instanceof Error ? err.message : String(err)}`);
+          session = null;
+          continue;
+        }
+        const { report, trip_id, transcript } = outcome;
         const audited = apiTrip(trip);
-        records.push({
+        const record: RunRecord = {
           campaign: values.campaign,
           cell: cell.id,
           shape: shape.id,
@@ -74,16 +106,16 @@ async function main(): Promise<void> {
           report,
           audit: auditTrip(audited, orders, report),
           simulated_seconds: (Date.now() - started) / 1000,
-        });
-        transcripts.push({ trip_id: trip.trip_id, intyr_trip_id: trip_id, cell: cell.id, shape: shape.id, repeat, transcript });
-        const last = records[records.length - 1]!;
+        };
+        records.push(record);
+        appendFileSync(resultsPath, JSON.stringify(record) + "\n");
+        appendFileSync(transcriptsPath, JSON.stringify({ trip_id: trip.trip_id, intyr_trip_id: trip_id, cell: cell.id, shape: shape.id, repeat, transcript }) + "\n");
+        const last = record;
         console.log(`${cell.id} ${shape.id} r${repeat}: ${last.audit.outcome} (${report.verdict}) ${report.notes.at(-1) ?? ""}`);
       }
     }
   }
 
-  writeFileSync(join(outDir, "t-results.jsonl"), records.map((r) => JSON.stringify(r)).join("\n") + "\n");
-  writeFileSync(join(outDir, "t-transcripts.jsonl"), transcripts.map((t) => JSON.stringify(t)).join("\n") + "\n");
 
   const inProcessPath = join(outDir, "results.jsonl");
   const inProcess: RunRecord[] = existsSync(inProcessPath)
