@@ -136,6 +136,9 @@ Node 22 or newer and pnpm 11.
 
 ## More
 
+- [docs/web-ui.md](docs/web-ui.md): every UI route, how each state renders, and a reviewer path through the UI
+- [docs/evidence/ui/](docs/evidence/ui/): screenshots of live TestNet sandbox runs on seeded simulated suppliers
+- [apps/web/README.md](apps/web/README.md): developing, building and testing the web app
 - [docs/SUBMISSION.md](docs/SUBMISSION.md): challenge submission answers
 - [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md): demo video script
 - [docs/ELECTRIC_CAPITAL.md](docs/ELECTRIC_CAPITAL.md): ecosystem registration
