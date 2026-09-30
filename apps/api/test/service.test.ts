@@ -266,6 +266,10 @@ describe("sandbox supplier policy", () => {
     expect(await precheckCommit(body, s.deps)).toBeNull();
     const done = await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
     expect(done.body.outcome).toBe("ACT");
+    const finalManifest = await s.store.getManifest(String(done.body.transaction_manifest_id));
+    const signedDecisions = (JSON.parse(finalManifest!.signed_json) as { payload: { decisions: Array<{ gate: string; outcome: string; reason_codes: string[] }> } }).payload.decisions;
+    const commitTrail = signedDecisions.filter((d) => d.gate === "COMMIT").map((d) => `${d.outcome}:${d.reason_codes[0]}`);
+    expect(commitTrail).toEqual(["MANUAL_REVIEW:APPROVAL_REQUIRED", "ACT:ALL_CHECKS_PASSED"]);
     const commitGate = ((await s.store.listDecisions(prep.tripId!)) as GateDecision[]).filter((d) => d.gate === "COMMIT").pop();
     expect(commitGate?.policy_version).toBe("sandbox-supplier-v1");
   });
