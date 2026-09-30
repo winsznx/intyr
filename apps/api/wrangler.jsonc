@@ -10,7 +10,7 @@
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": true
+    "run_worker_first": ["/v1/*", "/sandbox/*", "/.well-known/*", "/llms.txt", "/openapi.json", "/healthz", "/version"]
   },
   "d1_databases": [
     {

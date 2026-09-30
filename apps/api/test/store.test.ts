@@ -59,3 +59,29 @@ describe("D1SimulatorStore", () => {
     expect(await s.get("k")).toBe("2");
   });
 });
+
+describe("text primary keys", () => {
+  it("refuses a NULL key, which SQLite would otherwise accept in a TEXT PRIMARY KEY", async () => {
+    const db = createTestD1();
+    await expect(db.prepare("INSERT INTO sim_kv (k, v, updated_at) VALUES (NULL, 'v', 't')").run()).rejects.toThrow(/sim_kv\.k must not be null/);
+    await db.prepare("INSERT INTO sim_kv (k, v, updated_at) VALUES ('a', 'v', 't')").run();
+    await expect(db.prepare("UPDATE sim_kv SET k = NULL WHERE k = 'a'").run()).rejects.toThrow(/sim_kv\.k must not be null/);
+  });
+
+  it("guards every TEXT primary key in the schema, so a table added later without a guard fails here", async () => {
+    const db = createTestD1();
+    const tables = (await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all<{ name: string }>()).results ?? [];
+    const unguarded: string[] = [];
+    let checked = 0;
+    for (const { name } of tables) {
+      const keys = (await db.prepare(`SELECT name, type, "notnull" AS required FROM pragma_table_info('${name}') WHERE pk > 0`).all<{ name: string; type: string; required: number }>()).results ?? [];
+      for (const key of keys.filter((k) => k.type.toUpperCase() === "TEXT" && k.required === 0)) {
+        checked++;
+        const guard = await db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?1 AND name LIKE '%not_null_insert'").bind(name).first<{ n: number }>();
+        if (!guard?.n) unguarded.push(`${name}.${key.name}`);
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(12);
+    expect(unguarded).toEqual([]);
+  });
+});
