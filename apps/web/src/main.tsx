@@ -10,6 +10,9 @@ import "./styles/components.css";
 import "./styles/layout.css";
 import "./styles/rails.css";
 import "./styles/pages.css";
+import "./styles/landing.css";
+import "./styles/proof.css";
+import "./styles/app-pages.css";
 import { router } from "./router";
 
 const root = document.getElementById("root");

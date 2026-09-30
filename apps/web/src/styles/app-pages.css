@@ -1,0 +1,372 @@
+/* Sandbox app pages: trips queue, trip detail, new trip, approve, demo. */
+
+/* Verdict strip: the first thing on a trip page. */
+.verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 32px;
+  padding: 24px 28px;
+  border-radius: var(--r-20);
+  background: var(--canvas);
+  border: 1px solid var(--app-line);
+}
+
+.verdict-main {
+  display: grid;
+  gap: 10px;
+  max-width: 680px;
+}
+
+.verdict-title {
+  font-size: clamp(24px, 2.4vw, 30px);
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.verdict-explain {
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.verdict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.verdict-unknown {
+  border-style: dashed;
+  border-color: var(--unknown-line);
+}
+
+.verdict-danger {
+  border-color: #f2c4c0;
+  box-shadow: inset 4px 0 0 var(--danger);
+}
+
+.verdict-amber {
+  box-shadow: inset 4px 0 0 var(--amber);
+}
+
+.verdict-review {
+  box-shadow: inset 4px 0 0 #c98a14;
+}
+
+.verdict-success {
+  box-shadow: inset 4px 0 0 var(--success);
+}
+
+/* Decision log */
+.decision-list {
+  display: grid;
+}
+
+.decision-list > li {
+  display: grid;
+  gap: 8px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--divider);
+}
+
+.decision-list > li:first-child {
+  border-top: 0;
+}
+
+.decision-gate {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notes-list {
+  display: grid;
+}
+
+.notes-list > li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--divider);
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notes-list > li:first-child {
+  border-top: 0;
+}
+
+/* Trips queue */
+.queue > li + li {
+  border-top: 1px solid var(--divider);
+}
+
+.queue-row {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) minmax(200px, 0.8fr) 110px 18px;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 22px;
+  transition: background-color var(--t-fast) var(--ease);
+}
+
+.queue-row:hover {
+  background: var(--app-hover);
+}
+
+.queue-row[data-urgent] {
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+
+.queue-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.queue-title {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.queue-legs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.queue-leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--app-band);
+  border: 1px solid var(--app-line);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.queue-leg svg {
+  width: 13px;
+  height: 13px;
+}
+
+.queue-needs {
+  display: grid;
+  gap: 2px;
+  font-size: 13.5px;
+}
+
+.queue-total {
+  text-align: right;
+  font-size: 14px;
+}
+
+.queue-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 1100px) {
+  .queue-row {
+    grid-template-columns: minmax(0, 1fr) auto 18px;
+    grid-template-areas:
+      "state total chev"
+      "main main chev"
+      "needs needs chev";
+    gap: 8px 12px;
+  }
+
+  .queue-state {
+    grid-area: state;
+  }
+
+  .queue-main {
+    grid-area: main;
+  }
+
+  .queue-needs {
+    grid-area: needs;
+  }
+
+  .queue-total {
+    grid-area: total;
+  }
+
+  .queue-chevron {
+    grid-area: chev;
+  }
+}
+
+/* Approval */
+.approve-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.sheet-panel {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--canvas);
+  border: 1px solid #ececea;
+  box-shadow: var(--shadow-sheet);
+}
+
+.approve-actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+}
+
+.approve-actions .btn {
+  min-height: 44px;
+}
+
+@media (max-width: 1100px) {
+  .approve-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Demo scenarios */
+.scenario-list {
+  display: grid;
+  gap: 12px;
+}
+
+.scenario {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: var(--r-16);
+  background: var(--canvas);
+  border: 1px solid var(--app-line);
+}
+
+.scenario-index {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--soft);
+  font-size: 15px;
+  color: var(--ink-2);
+}
+
+.scenario-body {
+  display: grid;
+  gap: 8px;
+}
+
+.scenario-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  font-size: 13.5px;
+}
+
+.scenario-facts dt {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  margin-bottom: 2px;
+}
+
+.scenario-facts dd {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+@media (max-width: 820px) {
+  .scenario {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-index {
+    display: none;
+  }
+
+  .scenario-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* New trip form */
+.form-card {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 20px 24px;
+  min-width: 0;
+}
+
+.form-card > legend.card-title {
+  float: left;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 16px;
+  clear: both;
+}
+
+.form-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.leg-toggle,
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.check-row {
+  align-items: flex-start;
+  font-size: 14px;
+}
+
+.leg-toggle input,
+.check-row input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--ink);
+  flex: none;
+}
+
+.check-row input {
+  margin-top: 2px;
+}
+
+.leg-toggle .meta {
+  margin-left: auto;
+}
+
+.form-actions {
+  gap: 16px;
+}
+
+.scenario-compact {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 14px 20px;
+}
+
+.scenario-compact .scenario-body {
+  gap: 2px;
+}

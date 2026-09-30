@@ -52,24 +52,30 @@ function preState(c: TripComponent): string {
 }
 
 function clockLine(c: TripComponent): string | null {
-  const held = c.inventory_held_until ? relativeTime(c.inventory_held_until) : null;
-  const price = c.price_valid_until ? relativeTime(c.price_valid_until) : null;
-  const cancel = c.free_cancel_until ? relativeTime(c.free_cancel_until) : null;
-  const parts: string[] = [];
-  if (held) parts.push(`held until ${held}`);
-  if (price) parts.push(`price valid ${price.startsWith("in ") ? "for " + price.slice(3) : "until " + price}`);
-  if (cancel) parts.push(`free cancel ${cancel.startsWith("in ") ? "for " + cancel.slice(3) : "ended " + cancel}`);
-  return parts.length ? parts.join(", ") : null;
+  const phrase = (iso: string | null | undefined, open: string, closed: string) => {
+    const rel = iso ? relativeTime(iso) : null;
+    if (!rel) return null;
+    return rel.startsWith("in ") ? `${open} for ${rel.slice(3)}` : `${closed} ${rel}`;
+  };
+  const parts = [
+    phrase(c.inventory_held_until, "Held", "Hold ended"),
+    phrase(c.price_valid_until, "Price valid", "Price expired"),
+    phrase(c.free_cancel_until, "Free cancellation", "Free cancellation ended"),
+  ].filter((p): p is string => Boolean(p));
+  return parts.length ? `${parts.join(". ")}.` : null;
 }
 
 export function TripRails({
   components,
   caption,
   compact,
+  showClocks = true,
 }: {
   components: TripComponent[];
   caption?: ReactNode;
   compact?: boolean;
+  /** Clocks are relative to now, so they are hidden once a trip is finished. */
+  showClocks?: boolean;
 }) {
   const ordered = [...components].sort((a, b) => (a.commit_order ?? 99) - (b.commit_order ?? 99));
   const hasOrder = ordered.some((c) => typeof c.commit_order === "number");
@@ -79,7 +85,7 @@ export function TripRails({
       <div className="rails-head" aria-hidden>
         <span />
         <span>Prepared</span>
-        <span className="rails-boundary-label">Commit boundary</span>
+        <span className="rails-boundary-label" data-label="Commit boundary" />
         <span>Outcome</span>
         <span />
       </div>
@@ -88,7 +94,7 @@ export function TripRails({
           const mode = c.preparation_mode ? PREPARATION_MODE[c.preparation_mode] : undefined;
           const post = postState(c);
           const pre = preState(c);
-          const clocks = compact ? null : clockLine(c);
+          const clocks = compact || !showClocks ? null : clockLine(c);
           const state = componentState(c.state);
           return (
             <li key={c.component_id} className="rail-row" data-post={post} data-pre={pre} data-irreversible={c.irreversible || undefined}>
@@ -131,7 +137,7 @@ export function TripRails({
 
               {!compact ? (
                 <div className="rail-detail">
-                  {mode ? <span>{mode.label}</span> : null}
+                  {mode ? <span className="rail-mode">{mode.label}.</span> : null}
                   {clocks ? <span>{clocks}</span> : null}
                   {c.irreversible ? <span className="rail-irrev">Cannot be undone once booked</span> : null}
                   {c.evidence_grade ? (
