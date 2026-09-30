@@ -122,6 +122,10 @@ importers:
       '@intyr/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
 
   packages/chain:
     dependencies:
@@ -140,6 +144,19 @@ importers:
       '@intyr/adapters':
         specifier: workspace:*
         version: link:../adapters
+      '@intyr/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.15
+
+  packages/verifier:
+    dependencies:
+      '@intyr/chain':
+        specifier: workspace:*
+        version: link:../chain
       '@intyr/core':
         specifier: workspace:*
         version: link:../core
