@@ -20,6 +20,7 @@ import {
 import { api } from "../../lib/api";
 import { algoExplorerTx, formatDateTime, formatMoney } from "../../lib/format";
 import { COMPONENT_TYPE, UNKNOWN_COPY, describeReason, tripState } from "../../lib/labels";
+import { componentNames as names, recoverySentence, sentenceStart } from "../../lib/recovery";
 import type { NextAction, Trip } from "../../lib/types";
 import { useResource } from "../../lib/use-resource";
 
@@ -164,30 +165,6 @@ const STRONG: Partial<Record<string, string>> = {
   RECOVERY_FAILED: "failed",
 };
 
-function names(list: Trip["components"]): string {
-  const words = list.map((c) => COMPONENT_TYPE[c.type] ?? c.type);
-  if (words.length <= 1) return words.join("");
-  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
-}
-
-function sentenceStart(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-}
-
-/** One sentence built only from component states, so it reads in five seconds and never claims more than the record. */
-export function recoverySentence(trip: Trip): string {
-  const failed = trip.components.filter((c) => c.state === "COMMIT_FAILED" || c.state === "UNAVAILABLE");
-  const cancelled = trip.components.filter((c) => c.state === "CANCELLED");
-  const replaced = trip.components.filter((c) => c.state === "REPLACED");
-  const booked = trip.components.filter((c) => c.state === "CONFIRMED");
-  const parts: string[] = [];
-  if (failed.length) parts.push(`${sentenceStart(names(failed))} failed at commit.`);
-  if (cancelled.length) parts.push(`${sentenceStart(names(cancelled))} cancelled inside the limit.`);
-  if (replaced.length) parts.push(`${sentenceStart(names(replaced))} replaced.`);
-  parts.push(booked.length ? `Still booked: ${names(booked).toLowerCase()}.` : "Nothing left booked.");
-  return parts.join(" ");
-}
-
 function earliestClock(trip: Trip): string | undefined {
   const times = trip.components
     .flatMap((c) => [c.price_valid_until, c.inventory_held_until])
@@ -308,6 +285,11 @@ function VerdictStrip({
         <div className="row">
           <TripStateChip state={trip.state} />
           {trip.environment !== "MAINNET" ? <Chip tone="outline">TestNet sandbox</Chip> : null}
+          {trip.scenario_seed !== undefined ? (
+            <a className="meta link" href={`/sandbox/v1/evidence/sim/${trip.scenario_seed}/orders`} target="_blank" rel="noreferrer">
+              Seeded scenario, seed {trip.scenario_seed}. Simulator order list
+            </a>
+          ) : null}
         </div>
         <h1 className="verdict-title">{headline}</h1>
         {explain ? <p className="verdict-explain">{explain}</p> : null}

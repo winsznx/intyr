@@ -286,6 +286,11 @@ export const PLAN_VERDICT: Record<string, { label: string; tone: Tone; explain: 
   DO_NOT_COMMIT: { label: "Do not commit", tone: "danger", explain: "At least one leg makes this trip unsafe to commit. The reasons are listed." },
 };
 
+/** True when a reason code has written copy rather than the generic fallback. */
+export function hasReasonCopy(code: string): boolean {
+  return Object.hasOwn(REASONS, code);
+}
+
 export function describeReason(code: string): string {
   return REASONS[code] ?? humanize(code);
 }
