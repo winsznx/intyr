@@ -151,18 +151,20 @@ export class LiteApiHotelsAdapter implements IntyrAdapter {
     if (!req.check_in || !req.check_out) return { ok: false, reason: "INVALID_REQUEST", detail: "check_in and check_out are required", retryable: false };
 
     const currency = req.currency.toUpperCase();
-    const searchBody = {
-      hotelIds: req.hotel_ids && req.hotel_ids.length > 0 ? req.hotel_ids : DEFAULT_HOTEL_IDS,
-      occupancies: [{ adults: Math.max(1, req.adults) }],
-      currency,
-      guestNationality: "US",
-      checkin: req.check_in,
-      checkout: req.check_out,
-      timeout: 8,
-    };
     try {
       let offerId = req.offer_id ?? null;
       let hotelName: string | null = null;
+      const where = offerId ? null : await this.searchArea(req);
+      if (where && !where.ok) return where.failure;
+      const searchBody = {
+        ...(where?.ok ? where.area : { hotelIds: req.hotel_ids && req.hotel_ids.length > 0 ? req.hotel_ids : DEFAULT_HOTEL_IDS }),
+        occupancies: [{ adults: Math.max(1, req.adults) }],
+        currency,
+        guestNationality: "US",
+        checkin: req.check_in,
+        checkout: req.check_out,
+        timeout: 8,
+      };
       if (!offerId) {
         const res = await this.call("POST", `${this.options.searchUrl ?? SEARCH_URL}/hotels/rates`, searchBody, READ_TIMEOUT_MS);
         if (res.status !== 200) {
@@ -382,6 +384,21 @@ export class LiteApiHotelsAdapter implements IntyrAdapter {
 
   private rejected(req: CommitRequest, code: string, detail: string, respondedAt: string): CommitResult {
     return { response: "REJECTED", no_booking_certain: true, refs: req.leg.refs, price: null, supplier_status: null, error_code: code, detail, responded_at: respondedAt, response_hash: null };
+  }
+
+  /**
+   * What to search. Explicit hotel ids win. Otherwise the destination text is resolved to a LiteAPI place and the
+   * search covers that place. With neither, the public sandbox property is used.
+   */
+  private async searchArea(req: ComponentRequest): Promise<{ ok: true; area: { hotelIds: string[] } | { placeId: string; maxRatesPerHotel: number; limit: number } } | { ok: false; failure: PrepareResult }> {
+    if (req.hotel_ids && req.hotel_ids.length > 0) return { ok: true, area: { hotelIds: req.hotel_ids } };
+    const destination = req.destination?.trim();
+    if (!destination) return { ok: true, area: { hotelIds: DEFAULT_HOTEL_IDS } };
+    const res = await this.call("GET", `${this.options.searchUrl ?? SEARCH_URL}/data/places?textQuery=${encodeURIComponent(destination)}`, undefined, READ_TIMEOUT_MS);
+    if (res.status !== 200) return { ok: false, failure: { ok: false, reason: "SUPPLIER_ERROR", detail: errorCode(res.body).message ?? `place search failed with ${res.status}`, retryable: res.status >= 500 } };
+    const placeId = str(rec(arr(rec(res.body).data)[0]).placeId);
+    if (!placeId) return { ok: false, failure: { ok: false, reason: "NO_OFFER", detail: `no place found for ${destination}`, retryable: false } };
+    return { ok: true, area: { placeId, maxRatesPerHotel: 1, limit: 20 } };
   }
 
   private read(found: PostconditionResult["found"], refs: SupplierRefs, detail: string): PostconditionResult {

@@ -181,6 +181,31 @@ describe("liteapi-hotels", () => {
     expect((calls[1]!.body as { offerId: string }).offerId).toBe("OFF_CHEAP");
   });
 
+  it("resolves the destination to a place and searches that place instead of the default property", async () => {
+    const { fetch, calls } = mockFetch([
+      [/GET .*data\/places\?textQuery=London/, 200, { data: [{ placeId: "PLACE_LONDON", displayName: "London" }] }],
+      [/POST .*hotels\/rates/, 200, rates],
+      [/POST .*rates\/prebook/, 200, prebook],
+    ]);
+    const adapter = new LiteApiHotelsAdapter({ apiKey: "sand_x", fetch, clock });
+    const res = await adapter.prepare({ component_id: "cmp_2", type: "HOTEL", destination: "London", check_in: "2026-11-02", check_out: "2026-11-04", adults: 1, currency: "USD" });
+    expect(res.ok).toBe(true);
+    const search = calls.find((c) => c.url.endsWith("/hotels/rates"))!.body as { placeId?: string; hotelIds?: string[] };
+    expect(search.placeId).toBe("PLACE_LONDON");
+    expect(search.hotelIds).toBeUndefined();
+  });
+
+  it("fails as no offer when the destination matches no place, and lets explicit hotel ids skip the place search", async () => {
+    const none = mockFetch([[/GET .*data\/places/, 200, { data: [] }]]);
+    const missing = await new LiteApiHotelsAdapter({ apiKey: "sand_x", fetch: none.fetch, clock }).prepare({ component_id: "c", type: "HOTEL", destination: "Nowhereville", check_in: "2026-11-02", check_out: "2026-11-04", adults: 1, currency: "USD" });
+    expect(missing).toMatchObject({ ok: false, reason: "NO_OFFER" });
+
+    const explicit = mockFetch([[/POST .*hotels\/rates/, 200, rates], [/POST .*rates\/prebook/, 200, prebook]]);
+    await new LiteApiHotelsAdapter({ apiKey: "sand_x", fetch: explicit.fetch, clock }).prepare({ component_id: "c", type: "HOTEL", destination: "London", hotel_ids: ["lp9"], check_in: "2026-11-02", check_out: "2026-11-04", adults: 1, currency: "USD" });
+    expect(explicit.calls.some((c) => c.url.includes("data/places"))).toBe(false);
+    expect((explicit.calls[0]!.body as { hotelIds: string[] }).hotelIds).toEqual(["lp9"]);
+  });
+
   it("sends clientReference and treats 4005 as a booking that may exist", async () => {
     const { fetch, calls } = mockFetch([
       [/POST .*hotels\/rates/, 200, rates],
