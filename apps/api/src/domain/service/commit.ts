@@ -370,7 +370,8 @@ export async function runCommit(body: unknown, ctx: PaidContext, deps: ServiceDe
       status: httpForOutcome(gate.outcome),
       tripId: row.id,
       body: { trip_id: row.id, state: row.state, outcome: gate.outcome, decision_id: gate.decision_id, reason_codes: gate.reason_codes, next_actions: gate.next_actions, no_supplier_call_made: true },
-      feeFailure: "COMMIT_NOT_EXECUTED",
+      // A replay of a commit that already started or finished is delivered work, so its fee is kept.
+      ...(gate.outcome === "NO_ACTION" ? {} : { feeFailure: "COMMIT_NOT_EXECUTED" as const }),
     };
   }
 
@@ -411,8 +412,16 @@ export async function runCommit(body: unknown, ctx: PaidContext, deps: ServiceDe
  * Cron reconciler. For every trip stuck in COMMIT_STATUS_UNKNOWN, resume the commit: the next-step rule reads the
  * unsettled component by our own reference first, and only continues forward once the gate has settled it.
  */
+/** A live commit touches its trip far more often than this, so a trip idle this long in COMMITTING has no runner. */
+const STUCK_COMMIT_MS = 5 * 60_000;
+
 export async function reconcileUnknownTrips(deps: ServiceDeps, session: (tripId: string) => Promise<Parameters<typeof finalizeManifest>[3] | null>): Promise<number> {
-  const rows = await deps.store.listTripsByState(["COMMIT_STATUS_UNKNOWN"], 20);
+  const stuckBefore = deps.now().getTime() - STUCK_COMMIT_MS;
+  const rows = [
+    ...(await deps.store.listTripsByState(["COMMIT_STATUS_UNKNOWN"], 20)),
+    // A commit whose invocation died mid-saga stays COMMITTING. After the lease the reconciler resumes it the same way.
+    ...(await deps.store.listTripsByState(["COMMITTING"], 20)).filter((r) => Date.parse(r.updated_at) <= stuckBefore),
+  ];
   let resolved = 0;
   for (const row of rows) {
     const doc = JSON.parse(row.doc_json) as TripDoc;
