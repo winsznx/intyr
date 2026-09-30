@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+out/
+.next/
+.open-next/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# runtime and tooling state
+.wrangler/
+.vercel/
+.dev.vars
+
+# environment files and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+
+# logs and editor state
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
