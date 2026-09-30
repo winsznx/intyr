@@ -69,6 +69,15 @@ export class TripStore {
     return this.db.prepare("SELECT * FROM trips WHERE id = ?1").bind(id).first<TripRow>();
   }
 
+  async listTripsByState(states: string[], limit = 25): Promise<TripRow[]> {
+    const ph = states.map((_, i) => `?${i + 1}`).join(",");
+    const r = await this.db
+      .prepare(`SELECT * FROM trips WHERE state IN (${ph}) ORDER BY updated_at LIMIT ?${states.length + 1}`)
+      .bind(...states, limit)
+      .all<TripRow>();
+    return r.results ?? [];
+  }
+
   async listTrips(owner: string, limit = 50): Promise<TripRow[]> {
     const r = await this.db.prepare("SELECT * FROM trips WHERE owner = ?1 ORDER BY created_at DESC LIMIT ?2").bind(owner, limit).all<TripRow>();
     return r.results ?? [];

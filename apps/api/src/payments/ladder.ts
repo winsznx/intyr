@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { getCookie } from "hono/cookie";
 import { HonoAdapter } from "@x402/hono";
 import {
   decodePaymentSignatureHeader,
@@ -40,6 +41,8 @@ export interface PaidRoute {
 
 export interface PaidContext {
   network: "mainnet" | "testnet";
+  /** Raw value of the sandbox session cookie, when present. Handlers validate it before using it. */
+  sandboxSessionId?: string;
   body: unknown;
   session: PaymentSession;
   operationId: string;
@@ -158,6 +161,7 @@ export function createLadder(deps: LadderDeps) {
     settlementHeaders: Record<string, string>,
   ): Promise<Response> {
     const at = now();
+    const sandboxSessionId = getCookie(c, "intyr_sbx");
     const { created, operation } = await createOperation(deps.db, session.id, route.key, at);
     if (!created && operation.status !== "PENDING") return replayOperation(c, session, operation, settlementHeaders);
     if (!created && operation.status === "PENDING" && Date.parse(at) - Date.parse(operation.updated_at) < 30_000) {
@@ -168,7 +172,7 @@ export function createLadder(deps: LadderDeps) {
     }
     let result: HandlerResult;
     try {
-      result = await route.handler({ network: deps.net.name, body, session, operationId: operation.id, now: at });
+      result = await route.handler({ network: deps.net.name, ...(sandboxSessionId ? { sandboxSessionId } : {}), body, session, operationId: operation.id, now: at });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       const failed = envelope(session, deps.net, {
