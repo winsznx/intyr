@@ -5,6 +5,7 @@ import {
   buildTransactionManifest,
   componentRoot,
   evidenceBanner,
+  integrityProofState,
   merkleRoot,
   signCommitManifest,
   signTransactionManifest,
@@ -13,7 +14,7 @@ import {
   type CommitManifestInput,
 } from "../src/manifest";
 import { generateSigningKey, publishedKey, signDocument } from "../src/sign";
-import { HASH_A, inMinutes, manifestComponent, NOW, TRIP_ID } from "./fixtures";
+import { HASH_A, HASH_B, inMinutes, manifestComponent, NOW, TRIP_ID } from "./fixtures";
 
 const hex = (hash: string) => hash.slice("sha256:".length);
 
@@ -171,6 +172,56 @@ describe("transaction manifest", () => {
       manifest.decisions_root === (await merkleRoot(decisions.map((d) => d.decision_hash))),
       await verifyManifestDocument(signed, published),
     ]).toEqual([true, { ok: true }]);
+  });
+});
+
+describe("transaction manifest decisions root", () => {
+  it("catches a decision log edited under a validly re-signed but stale root", async () => {
+    // #given a transaction manifest whose decision list lost an entry after the root was computed
+    const { key, published } = await keys();
+    const manifest = await buildTransactionManifest({
+      manifest_id: "man_3",
+      trip_id: TRIP_ID,
+      environment: "TESTNET",
+      created_at: NOW.toISOString(),
+      commit_manifest_hash: HASH_A,
+      final_state: "RECOVERED",
+      components: [manifestComponent("cmp_hotel")],
+      decisions: [
+        { decision_id: "dec_1", gate: "COMMIT", outcome: "ACT", reason_codes: ["ALL_CHECKS_PASSED"], decision_hash: HASH_A },
+        { decision_id: "dec_2", gate: "RECOVERY_ACTION", outcome: "ACT", reason_codes: ["CANCEL_WITHIN_FREE_WINDOW"], decision_hash: HASH_B },
+      ],
+      non_actions: [],
+      inbound_payments: [],
+      outbound_payments: [],
+      anchors: [],
+      stranded_spend_minor: 0,
+      assurance: { mode: "NONE" },
+    });
+    const edited = { ...manifest, decisions: manifest.decisions.slice(0, 1) };
+
+    // #when it is signed anyway and verified
+    const check = await verifyManifestDocument(await signDocument(key, "intyr/transaction/v1", edited), published);
+
+    // #then the recomputed decisions root exposes the edit, reported as a hash mismatch
+    expect([check, integrityProofState(check)]).toEqual([{ ok: false, reason: "DECISIONS_ROOT_MISMATCH" }, "HASH_MISMATCH"]);
+  });
+});
+
+describe("integrityProofState", () => {
+  it.each([
+    { reason: "HASH_MISMATCH", state: "HASH_MISMATCH" },
+    { reason: "COMPONENT_ROOT_MISMATCH", state: "HASH_MISMATCH" },
+    { reason: "DECISIONS_ROOT_MISMATCH", state: "HASH_MISMATCH" },
+    { reason: "SIGNATURE_INVALID", state: "SIGNATURE_INVALID" },
+    { reason: "UNKNOWN_KEY", state: "SIGNATURE_INVALID" },
+    { reason: "KEY_REVOKED", state: "SIGNATURE_INVALID" },
+  ] as const)("reports $reason as $state", ({ reason, state }) => {
+    expect(integrityProofState({ ok: false, reason })).toBe(state);
+  });
+
+  it("reports nothing for a document that verifies", () => {
+    expect(integrityProofState({ ok: true })).toBeNull();
   });
 });
 

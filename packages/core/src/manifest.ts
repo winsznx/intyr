@@ -2,7 +2,7 @@ import { canonicalize } from "./canonical";
 import { hashValue, sha256Hex } from "./hash";
 import { signDocument, verifyDocument, type PublishedKey, type Signed, type SigningKey } from "./sign";
 import type { CommitManifest, ManifestComponent, ManifestStatusRecord, TransactionManifest } from "./types";
-import type { EvidenceBanner, ManifestStatus } from "./vocab";
+import type { EvidenceBanner, ManifestStatus, ProofState } from "./vocab";
 
 const EMPTY_ROOT_INPUT = "intyr/empty-root";
 
@@ -103,21 +103,45 @@ export function statusRecord(
 
 export type ManifestCheck =
   | { ok: true }
-  | { ok: false; reason: "HASH_MISMATCH" | "SIGNATURE_INVALID" | "UNKNOWN_KEY" | "KEY_REVOKED" | "COMPONENT_ROOT_MISMATCH" };
+  | {
+      ok: false;
+      reason:
+        | "HASH_MISMATCH"
+        | "SIGNATURE_INVALID"
+        | "UNKNOWN_KEY"
+        | "KEY_REVOKED"
+        | "COMPONENT_ROOT_MISMATCH"
+        | "DECISIONS_ROOT_MISMATCH";
+    };
 
 /**
- * Offline integrity check: payload hash, signature, and a recomputed component
- * root. Chain linkage is checked separately against a public indexer.
+ * Offline integrity check: payload hash, signature, and recomputed component
+ * and decisions roots. Chain linkage is checked separately against a public indexer.
  */
 export async function verifyManifestDocument<T extends CommitManifest | TransactionManifest>(
   doc: Signed<T>,
   keys: PublishedKey[],
 ): Promise<ManifestCheck> {
-  const context = doc.payload.schema_version === "commit-manifest/1" ? "intyr/manifest/v1" : "intyr/transaction/v1";
+  const payload: CommitManifest | TransactionManifest = doc.payload;
+  const context = payload.schema_version === "commit-manifest/1" ? "intyr/manifest/v1" : "intyr/transaction/v1";
   const check = await verifyDocument(doc, context, keys);
   if (!check.ok) return check;
-  if ((await componentRoot(doc.payload.components)) !== doc.payload.component_root) {
+  if ((await componentRoot(payload.components)) !== payload.component_root) {
     return { ok: false, reason: "COMPONENT_ROOT_MISMATCH" };
   }
+  if (
+    payload.schema_version === "transaction-manifest/1" &&
+    (await merkleRoot(payload.decisions.map((d) => d.decision_hash))) !== payload.decisions_root
+  ) {
+    return { ok: false, reason: "DECISIONS_ROOT_MISMATCH" };
+  }
   return { ok: true };
+}
+
+/** Proof state a failed integrity check reports. A root that does not match its leaves is a hash mismatch, not a bad signature. */
+export function integrityProofState(check: ManifestCheck): Extract<ProofState, "HASH_MISMATCH" | "SIGNATURE_INVALID"> | null {
+  if (check.ok) return null;
+  return check.reason === "SIGNATURE_INVALID" || check.reason === "UNKNOWN_KEY" || check.reason === "KEY_REVOKED"
+    ? "SIGNATURE_INVALID"
+    : "HASH_MISMATCH";
 }
