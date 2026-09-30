@@ -12,7 +12,7 @@ Options:
   --host <url>             Intyr host (default https://intyr.timjosh507.workers.dev)
   --sandbox                Read the manifest from /sandbox/v1 instead of /v1
   --key <base64url>        Pin the expected Ed25519 public key instead of trusting the host's key set
-  --anchor-account <addr>  Only accept an anchor sent by this account
+  --anchor-account <addr>  Only accept an anchor sent by this account (default: the host's published anchor_accounts)
   --json                   Print the full report as JSON
 
 Exit code 0 means PROOF_VERIFIED, 1 any other proof state, 2 a usage or fetch error.`;
@@ -78,19 +78,23 @@ export async function main(argv: string[]): Promise<number> {
   try {
     const read = await getJson<ManifestRead>(manifestUrl(args));
     const host = /^https?:\/\//.test(args.target) ? new URL(args.target).origin : args.host;
-    const published = await getJson<{ keys: PublishedKey[] }>(`${host}/.well-known/intyr-signing-keys.json`);
+    const published = await getJson<{ keys: PublishedKey[]; anchor_accounts?: Record<string, string> }>(
+      `${host}/.well-known/intyr-signing-keys.json`,
+    );
     const keys = args.key ? published.keys.filter((k) => k.public_key === args.key) : published.keys;
     if (args.key && keys.length === 0) {
       console.error(`The host does not publish the pinned key ${args.key}.`);
       return 1;
     }
     const anchor = read.anchor?.txid ? { network: read.anchor.network, txid: read.anchor.txid } : null;
+    const anchorAccounts =
+      anchor && args.anchorAccount ? { ...published.anchor_accounts, [anchor.network]: args.anchorAccount } : published.anchor_accounts;
     const report = await verifyProof({
       signed: read.signed,
       keys,
       anchor,
       ...(read.status ? { status: read.status } : {}),
-      ...(anchor && args.anchorAccount ? { anchorAccounts: { [anchor.network]: args.anchorAccount } } : {}),
+      ...(anchorAccounts && Object.keys(anchorAccounts).length > 0 ? { anchorAccounts } : {}),
     });
     console.log(args.json ? JSON.stringify(report, null, 2) : renderReport(report, anchor?.network));
     if (!args.key && !args.json) console.log(`\nKeys were read from ${host}. Pin one with --key to check against an independent copy.`);
