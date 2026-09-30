@@ -71,6 +71,17 @@ describe("simulator adapter", () => {
     expect(second.status).toBe("UNCHANGED");
   });
 
+  it("rejects a stale-price commit on PRICE_DIVERGENCE and reports the new price on the next read", async () => {
+    const { sim } = setup();
+    const leg = await prepared(sim, "PRICE_DIVERGENCE");
+    const res = await sim.commit(commitReq(leg));
+    expect(res.response).toBe("REJECTED");
+    expect(res.error_code).toBe("price_changed");
+    const after = await sim.revalidate(leg);
+    expect(after.status).toBe("PRICE_CHANGED");
+    expect(after.leg.price.amount_minor).toBe(Math.round(leg.price.amount_minor * 1.08));
+  });
+
   it("rejects definitely when inventory is gone at commit", async () => {
     const { sim } = setup();
     const leg = await prepared(sim, "UNAVAILABLE_AT_COMMIT");

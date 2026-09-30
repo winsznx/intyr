@@ -235,15 +235,13 @@ export class SimulatorAdapter implements IntyrAdapter {
     if (!offer) {
       return { status: "UNAVAILABLE", leg, previous_price: leg.price, checked_at: iso(now), response_hash: null, detail: "offer not found" };
     }
-    offer.revalidations += 1;
-    let status: RevalidateResult["status"] = "UNCHANGED";
-    let updated = leg;
-    if (offer.scenario === "PRICE_DIVERGENCE" && offer.revalidations === 1) {
-      const newPrice: Money = { ...offer.price, amount_minor: Math.round(offer.price.amount_minor * 1.08) };
-      offer.price = newPrice;
-      status = "PRICE_CHANGED";
-      updated = { ...leg, price: newPrice };
+    if (offer.scenario === "PRICE_DIVERGENCE" && offer.revalidations === 0) {
+      offer.price = { ...offer.price, amount_minor: Math.round(offer.price.amount_minor * 1.08) };
     }
+    offer.revalidations += 1;
+    const changed = offer.price.amount_minor !== leg.price.amount_minor;
+    const status: RevalidateResult["status"] = changed ? "PRICE_CHANGED" : "UNCHANGED";
+    const updated: PreparedLeg = changed ? { ...leg, price: offer.price } : leg;
     await this.save(seed, state);
     return {
       status,
@@ -276,6 +274,12 @@ export class SimulatorAdapter implements IntyrAdapter {
     if (offer.price.amount_minor > req.max_total.amount_minor) return reject("price_changed", "offer price exceeds the committed maximum");
 
     const scenario = offer.scenario;
+    // The supplier repriced whether or not anyone looked: paying the stale price fails, as with Duffel's price_changed.
+    if (scenario === "PRICE_DIVERGENCE" && offer.revalidations === 0) {
+      offer.price = { ...offer.price, amount_minor: Math.round(offer.price.amount_minor * 1.08) };
+      offer.revalidations = 1;
+      return reject("price_changed", "offer price changed since it was quoted");
+    }
     if (scenario === "UNAVAILABLE_AT_COMMIT") return reject("offer_no_longer_available", "inventory sold out before commit");
     if (scenario === "COMMIT_REJECT") return reject("supplier_rejected", "supplier refused the booking");
     if (scenario === "HOLD_EXPIRY" && req.leg.preparation_mode === "HARD_HOLD") return reject("hold_expired", "hold expired before payment");
