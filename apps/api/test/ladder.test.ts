@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import { networkConfig } from "../src/config";
+import type { NetworkDeps } from "../src/app";
 import { createLadder } from "../src/payments/ladder";
 import { createX402Server } from "../src/server";
 import { createApp } from "../src/app";
@@ -23,8 +24,8 @@ interface Harness {
 
 async function harness(domain?: DomainHandlers): Promise<Harness> {
   const db = createTestD1();
-  const env = { DB: db, NETWORK: "testnet", FACILITATOR_URL: "unused", PAY_TO } as unknown as Env;
-  const net = networkConfig(env);
+  const env = { DB: db, FACILITATOR_URL: "unused", PAY_TO_TESTNET: PAY_TO } as unknown as Env;
+  const net = networkConfig("testnet");
   const fac = fakeFacilitator();
   const { httpServer } = createX402Server(net, PAY_TO, fac);
   await httpServer.initialize();
@@ -65,7 +66,7 @@ async function harness(domain?: DomainHandlers): Promise<Harness> {
       },
     },
   };
-  const app = createApp({ env, net, ladder, domain: handlers, version: { name: "intyr", commit: "test", contract_versions: {} } });
+  const app = createApp({ env, testnet: { net, payTo: PAY_TO, ladder } as NetworkDeps, domain: handlers, version: { name: "intyr", commit: "test", contract_versions: {} } });
   return { app, db, fac, chain, handlerCalls };
 }
 
@@ -103,7 +104,7 @@ async function pay(path: string, body: unknown, opts: { payer?: ReturnType<typeo
 
 describe("x402 challenge", () => {
   it("answers 402 with the challenge tag, fee payer and a Bazaar extension before any payment", async () => {
-    const { res, requirements } = await challenge(h, "/v1/trips/check", { legs: [] });
+    const { res, requirements } = await challenge(h, "/sandbox/v1/trips/check", { legs: [] });
     expect(res.status).toBe(402);
     const accept = requirements as { network: string; asset: string; amount: string; payTo: string; extra: Record<string, unknown> };
     expect(accept.network).toBe("algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=");
@@ -120,7 +121,7 @@ describe("x402 challenge", () => {
 
 describe("payment ladder", () => {
   it("settles before the handler runs and returns the operation with payment facts", async () => {
-    const { res, built } = await pay("/v1/trips/check", { legs: [1] });
+    const { res, built } = await pay("/sandbox/v1/trips/check", { legs: [1] });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.plan_id).toBe("man_test");
@@ -133,9 +134,9 @@ describe("payment ladder", () => {
   });
 
   it("replaying the same proof returns the same operation and never settles or runs twice", async () => {
-    const first = await pay("/v1/trips/check", { legs: [1] });
+    const first = await pay("/sandbox/v1/trips/check", { legs: [1] });
     const firstBody = (await first.res.json()) as Record<string, unknown>;
-    const again = await h.app.request(URL_ + "/v1/trips/check", {
+    const again = await h.app.request(URL_ + "/sandbox/v1/trips/check", {
       method: "POST",
       headers: { "content-type": "application/json", "payment-signature": first.built.header },
       body: JSON.stringify({ legs: [1] }),
@@ -149,9 +150,9 @@ describe("payment ladder", () => {
   });
 
   it("rejects a proof reused for a different body with PAYMENT_BINDING_MISMATCH and does no work", async () => {
-    const first = await pay("/v1/trips/check", { legs: [1] });
+    const first = await pay("/sandbox/v1/trips/check", { legs: [1] });
     expect(first.res.status).toBe(200);
-    const other = await h.app.request(URL_ + "/v1/trips/check", {
+    const other = await h.app.request(URL_ + "/sandbox/v1/trips/check", {
       method: "POST",
       headers: { "content-type": "application/json", "payment-signature": first.built.header },
       body: JSON.stringify({ legs: [1, 2] }),
@@ -162,7 +163,7 @@ describe("payment ladder", () => {
   });
 
   it("refuses before charging when the gate says REFUSE", async () => {
-    const res = await h.app.request(URL_ + "/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refuse: true }) });
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ refuse: true }) });
     expect(res.status).toBe(422);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.outcome).toBe("REFUSE");
@@ -173,9 +174,9 @@ describe("payment ladder", () => {
 
   it("rejects a payment whose amount does not match the route before contacting the facilitator", async () => {
     const payer = newPayer();
-    const { requirements } = await challenge(h, "/v1/trips/check", {});
-    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/v1/trips/check", amount: "1" });
-    const res = await h.app.request(URL_ + "/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: "{}" });
+    const { requirements } = await challenge(h, "/sandbox/v1/trips/check", {});
+    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/sandbox/v1/trips/check", amount: "1" });
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: "{}" });
     expect(res.status).toBe(402);
     expect(((await res.json()) as { error: string }).error).toBe("PAYMENT_INVALID");
     expect(h.fac.calls.verify + h.fac.calls.settle).toBe(0);
@@ -184,10 +185,10 @@ describe("payment ladder", () => {
   it("never answers 402 for an unknown settlement: 202 PAYMENT_PENDING, then resolves by reading the stored txid", async () => {
     h.fac.mode.settle = "throw";
     const payer = newPayer();
-    const { requirements } = await challenge(h, "/v1/trips/check", { a: 1 });
-    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/v1/trips/check" });
+    const { requirements } = await challenge(h, "/sandbox/v1/trips/check", { a: 1 });
+    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/sandbox/v1/trips/check" });
     h.chain.mode = "absent";
-    const res = await h.app.request(URL_ + "/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 1 }) });
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 1 }) });
     expect(res.status).toBe(202);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.status).toBe("PAYMENT_PENDING");
@@ -198,7 +199,7 @@ describe("payment ladder", () => {
     // The money did land. The node now shows it, and replaying the same proof runs the work once.
     h.chain.mode = "confirmed";
     confirmedFor(h, payer.addr, "100000");
-    const again = await h.app.request(URL_ + "/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 1 }) });
+    const again = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 1 }) });
     expect(again.status).toBe(200);
     expect(h.handlerCalls.n).toBe(1);
     expect(h.fac.calls.settle).toBe(1);
@@ -207,10 +208,10 @@ describe("payment ladder", () => {
   it("proceeds when the facilitator response is lost but the ledger shows the payment", async () => {
     h.fac.mode.settle = "throw";
     const payer = newPayer();
-    const { requirements } = await challenge(h, "/v1/trips/check", { a: 2 });
-    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/v1/trips/check" });
+    const { requirements } = await challenge(h, "/sandbox/v1/trips/check", { a: 2 });
+    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/sandbox/v1/trips/check" });
     confirmedFor(h, payer.addr, "100000");
-    const res = await h.app.request(URL_ + "/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 2 }) });
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 2 }) });
     expect(res.status).toBe(200);
     expect(h.handlerCalls.n).toBe(1);
   });
@@ -218,11 +219,11 @@ describe("payment ladder", () => {
   it("does nothing and charges nothing when the payment never confirms and its window has passed", async () => {
     h.fac.mode.settle = "fail";
     const payer = newPayer();
-    const { requirements } = await challenge(h, "/v1/trips/check", { a: 3 });
-    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/v1/trips/check", lastValid: 2000 });
+    const { requirements } = await challenge(h, "/sandbox/v1/trips/check", { a: 3 });
+    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/sandbox/v1/trips/check", lastValid: 2000 });
     h.chain.mode = "absent";
     h.chain.current = 5000;
-    const res = await h.app.request(URL_ + "/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 3 }) });
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ a: 3 }) });
     expect(res.status).toBe(402);
     expect(h.handlerCalls.n).toBe(0);
     const s = await getSessionByTxid(h.db, built.txid);
@@ -231,22 +232,22 @@ describe("payment ladder", () => {
 
   it("requires our own chain read before a commit starts and answers 202 while the ledger has not shown it", async () => {
     const payer = newPayer();
-    const { requirements } = await challenge(h, "/v1/trips/commit", { trip_id: "trp_1" });
-    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/v1/trips/commit" });
+    const { requirements } = await challenge(h, "/sandbox/v1/trips/commit", { trip_id: "trp_1" });
+    const built = buildPaymentHeader({ payer, requirements, resourceUrl: URL_ + "/sandbox/v1/trips/commit" });
     h.chain.mode = "absent";
-    const res = await h.app.request(URL_ + "/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ trip_id: "trp_1" }) });
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/commit", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ trip_id: "trp_1" }) });
     expect(res.status).toBe(202);
     expect(((await res.json()) as { status: string }).status).toBe("PAYMENT_CONFIRMATION_PENDING");
     expect(h.handlerCalls.n).toBe(0);
   });
 
   it("records a failed operation with a refund record and replays it on the same proof", async () => {
-    const { res, built } = await pay("/v1/trips/recover", { trip_id: "trp_2" });
+    const { res, built } = await pay("/sandbox/v1/trips/recover", { trip_id: "trp_2" });
     expect(res.status).toBe(500);
     const body = (await res.json()) as { outcome: string; refund: { state: string }; operation_id: string };
     expect(body.outcome).toBe("FAILED_INTERNAL");
     expect(["REQUESTED", "DEFERRED"]).toContain(body.refund.state);
-    const again = await h.app.request(URL_ + "/v1/trips/recover", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ trip_id: "trp_2" }) });
+    const again = await h.app.request(URL_ + "/sandbox/v1/trips/recover", { method: "POST", headers: { "content-type": "application/json", "payment-signature": built.header }, body: JSON.stringify({ trip_id: "trp_2" }) });
     expect(again.status).toBe(500);
     expect(((await again.json()) as { operation_id: string }).operation_id).toBe(body.operation_id);
   });
@@ -254,8 +255,8 @@ describe("payment ladder", () => {
   it("tags payments from team wallets as INTERNAL_VALIDATION", async () => {
     const payer = newPayer();
     const db = createTestD1();
-    const env = { DB: db, NETWORK: "testnet", FACILITATOR_URL: "unused", PAY_TO } as unknown as Env;
-    const net = networkConfig(env);
+    const env = { DB: db, FACILITATOR_URL: "unused", PAY_TO_TESTNET: PAY_TO } as unknown as Env;
+    const net = networkConfig("testnet");
     const fac = fakeFacilitator();
     const { httpServer } = createX402Server(net, PAY_TO, fac);
     await httpServer.initialize();
@@ -265,11 +266,11 @@ describe("payment ladder", () => {
       return new Response("{}", { status: 404 });
     }) as unknown as typeof fetch;
     const ladder = createLadder({ db, httpServer, net, payTo: PAY_TO, teamWallets: [payer.addr], fetchFn, confirmWaitMs: 10, sleep: async () => undefined });
-    const app = createApp({ env, net, ladder, domain: { "POST /v1/trips/check": { handler: async () => ({ status: 200, body: {} }) } }, version: { name: "t", commit: "t", contract_versions: {} } });
-    const ch = await app.request(URL_ + "/v1/trips/check", { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
+    const app = createApp({ env, testnet: { net, payTo: PAY_TO, ladder } as NetworkDeps, domain: { "POST /v1/trips/check": { handler: async () => ({ status: 200, body: {} }) } }, version: { name: "t", commit: "t", contract_versions: {} } });
+    const ch = await app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
     const reqs = decodePaymentRequiredHeader(ch.headers.get("payment-required")!).accepts[0] as unknown as Record<string, unknown>;
-    const built = buildPaymentHeader({ payer, requirements: reqs, resourceUrl: URL_ + "/v1/trips/check" });
-    const res = await app.request(URL_ + "/v1/trips/check", { method: "POST", body: "{}", headers: { "content-type": "application/json", "payment-signature": built.header } });
+    const built = buildPaymentHeader({ payer, requirements: reqs, resourceUrl: URL_ + "/sandbox/v1/trips/check" });
+    const res = await app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST", body: "{}", headers: { "content-type": "application/json", "payment-signature": built.header } });
     expect(res.status).toBe(200);
     expect((await getSessionByTxid(db, built.txid))?.payer_class).toBe("INTERNAL_VALIDATION");
   });
@@ -278,7 +279,7 @@ describe("payment ladder", () => {
 describe("unbuilt routes", () => {
   it("refuse before any charge and never issue a 402", async () => {
     const h2 = await harness({});
-    const res = await h2.app.request(URL_ + "/v1/trips/prepare", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const res = await h2.app.request(URL_ + "/sandbox/v1/trips/prepare", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
     expect(res.status).toBe(503);
     expect(res.headers.get("payment-required")).toBeNull();
   });

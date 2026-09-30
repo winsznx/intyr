@@ -3,11 +3,11 @@ export type NetworkName = "mainnet" | "testnet";
 export interface Env {
   DB: D1Database;
   ASSETS?: Fetcher;
-  /** Which chain this deployment charges on. */
-  NETWORK: NetworkName;
   FACILITATOR_URL: string;
-  /** Receive-only address that x402 payments settle to. Public value. */
-  PAY_TO: string;
+  /** Receive-only Mainnet address that x402 payments settle to. Public value. Unset disables /v1. */
+  PAY_TO_MAINNET?: string;
+  /** Receive-only TestNet address for the sandbox. Unset disables /sandbox/v1. */
+  PAY_TO_TESTNET?: string;
   /** Comma separated wallets controlled by the team. Payments from them are tagged INTERNAL_VALIDATION. */
   TEAM_WALLETS?: string;
   ALGOD_URL?: string;

@@ -5,8 +5,17 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "intyr",
+      "database_id": "e678e19e-3be4-4671-bbd0-4c1764059b01",
+      "migrations_dir": "migrations"
+    }
+  ],
   "vars": {
-    "NETWORK": "testnet",
-    "FACILITATOR_URL": "https://facilitator.goplausible.xyz"
+    "FACILITATOR_URL": "https://facilitator.goplausible.xyz",
+    "PAY_TO_TESTNET": "ZBSIVWPNE3WGZBUTLNTGXJBBAAEWYVPHYQL2C2CGYFCLXEL2CWMNYTKTXA"
   }
 }

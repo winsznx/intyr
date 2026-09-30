@@ -2,7 +2,7 @@ import { HTTPFacilitatorClient, x402HTTPResourceServer, x402ResourceServer } fro
 import type { FacilitatorClient, RouteConfig } from "@x402/core/server";
 import { ExactAvmScheme } from "@x402/avm/exact/server";
 import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/extensions/bazaar";
-import { CHALLENGE_TAG, type NetworkConfig } from "./config";
+import { CHALLENGE_TAG, routePrefix, type NetworkConfig } from "./config";
 import { ROUTE_PRICES } from "./prices";
 
 const EXAMPLE_BODIES: Record<string, { input: Record<string, unknown>; output: Record<string, unknown> }> = {
@@ -46,7 +46,8 @@ export function buildRoutes(net: NetworkConfig, payTo: string): Record<string, R
   const routes: Record<string, RouteConfig> = {};
   for (const p of ROUTE_PRICES) {
     const ex = EXAMPLE_BODIES[p.key]!;
-    routes[p.key] = {
+    const prefix = routePrefix(net.name);
+    routes[`POST ${prefix}${p.path.slice("/v1".length)}`] = {
       accepts: [
         {
           scheme: "exact",

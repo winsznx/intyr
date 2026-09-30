@@ -39,6 +39,7 @@ export interface PaidRoute {
 }
 
 export interface PaidContext {
+  network: "mainnet" | "testnet";
   body: unknown;
   session: PaymentSession;
   operationId: string;
@@ -167,7 +168,7 @@ export function createLadder(deps: LadderDeps) {
     }
     let result: HandlerResult;
     try {
-      result = await route.handler({ body, session, operationId: operation.id, now: at });
+      result = await route.handler({ network: deps.net.name, body, session, operationId: operation.id, now: at });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       const failed = envelope(session, deps.net, {

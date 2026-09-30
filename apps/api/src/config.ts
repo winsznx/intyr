@@ -27,9 +27,14 @@ const TESTNET: NetworkConfig = {
   explorerTx: (txid) => `https://testnet.allo.info/tx/${txid}`,
 };
 
-export function networkConfig(env: Pick<Env, "NETWORK" | "ALGOD_URL" | "INDEXER_URL">): NetworkConfig {
-  const base = env.NETWORK === "mainnet" ? MAINNET : TESTNET;
-  return { ...base, algodUrl: env.ALGOD_URL ?? base.algodUrl, indexerUrl: env.INDEXER_URL ?? base.indexerUrl };
+export function networkConfig(name: NetworkName, env: Pick<Env, "ALGOD_URL" | "INDEXER_URL"> = {}): NetworkConfig {
+  const base = name === "mainnet" ? MAINNET : TESTNET;
+  // Endpoint overrides apply to Mainnet only so a sandbox can never read the wrong chain by accident.
+  return name === "mainnet" ? { ...base, algodUrl: env.ALGOD_URL ?? base.algodUrl, indexerUrl: env.INDEXER_URL ?? base.indexerUrl } : base;
+}
+
+export function routePrefix(name: NetworkName): "/v1" | "/sandbox/v1" {
+  return name === "mainnet" ? "/v1" : "/sandbox/v1";
 }
 
 export const CHALLENGE_TAG = "x402-global-challenge";
