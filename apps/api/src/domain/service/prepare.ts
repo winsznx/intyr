@@ -25,7 +25,7 @@ import {
 import type { HandlerResult, PaidContext } from "../../payments/ladder";
 import type { TripStore } from "../store";
 import { emptyTripDoc, type TripComponentDoc, type TripDoc, type TripNextAction } from "../trip-doc";
-import { DecisionLog, type ServiceDeps } from "./context";
+import { DecisionLog, getTripOnNetwork, type ServiceDeps } from "./context";
 import { paymentRefs, toManifestComponent } from "./convert";
 
 export function invalid(issues: Array<{ path: string; message: string }>): HandlerResult {
@@ -392,7 +392,7 @@ const REVALIDATABLE = ["PREPARED", "PREPARED_WITH_WARNINGS", "READY_TO_COMMIT"];
 export async function precheckRevalidate(body: unknown, deps: ServiceDeps): Promise<HandlerResult | null> {
   const parsed = parseWith(RevalidateRequestSchema, body);
   if (!parsed.ok) return { status: 422, body: { error: "INVALID_REQUEST", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], issues: parsed.issues, charged: false } };
-  const row = await deps.store.getTrip(parsed.value.trip_id);
+  const row = await getTripOnNetwork(deps, parsed.value.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } };
   if (!REVALIDATABLE.includes(row.state)) {
     return { status: 409, tripId: row.id, body: { error: "TRIP_STATE_CONFLICT", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], state: row.state, charged: false } };
@@ -403,7 +403,7 @@ export async function precheckRevalidate(body: unknown, deps: ServiceDeps): Prom
 export async function runRevalidate(body: unknown, ctx: PaidContext, deps: ServiceDeps): Promise<HandlerResult> {
   const parsed = parseWith(RevalidateRequestSchema, body);
   if (!parsed.ok) return invalid(parsed.issues);
-  const row = await deps.store.getTrip(parsed.value.trip_id);
+  const row = await getTripOnNetwork(deps, parsed.value.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } };
   const doc = JSON.parse(row.doc_json) as TripDoc;
   if (!REVALIDATABLE.includes(row.state)) {

@@ -1,6 +1,6 @@
 import type { AdapterRegistry } from "@intyr/adapters";
 import type { AnchorRef, Environment, GateDecision, SigningKey } from "@intyr/core";
-import type { TripStore } from "../store";
+import type { TripRow, TripStore } from "../store";
 
 export interface ServiceDeps {
   store: TripStore;
@@ -13,6 +13,15 @@ export interface ServiceDeps {
   /** Records a manifest hash on chain. Returns null when anchoring is not configured. */
   /** `wait: false` submits the anchor and returns at once, leaving it for the cron to confirm. The final receipt waits. */
   anchor?: (manifestId: string, manifestHash: string, opts?: { wait: boolean }) => Promise<(AnchorRef & { state?: string }) | null>;
+}
+
+/**
+ * A trip belongs to the network it was prepared on. A trip id from the other host is treated as unknown, so a TestNet
+ * sandbox trip can never be committed, recovered or signed as a Mainnet record.
+ */
+export async function getTripOnNetwork(deps: Pick<ServiceDeps, "store" | "environment">, tripId: string): Promise<TripRow | null> {
+  const row = await deps.store.getTrip(tripId);
+  return row && row.network === deps.environment.toLowerCase() ? row : null;
 }
 
 /** Hash-chained decision log for one trip. Every gate decision is stored before its effect is applied. */

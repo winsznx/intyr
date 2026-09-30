@@ -21,7 +21,7 @@ import type { HandlerResult, PaidContext } from "../../payments/ladder";
 import type { AttemptRow, ManifestRow, TripRow } from "../store";
 import { VersionConflictError } from "../store";
 import type { TripComponentDoc, TripDoc } from "../trip-doc";
-import { DecisionLog, type ServiceDeps } from "./context";
+import { DecisionLog, getTripOnNetwork, type ServiceDeps } from "./context";
 import { finalizeManifest, performRecovery } from "./recover";
 import { updateTripDoc } from "./trip-update";
 
@@ -94,7 +94,7 @@ async function gateInput(deps: ServiceDeps, row: TripRow, request: CommitRequest
 export async function precheckCommit(body: unknown, deps: ServiceDeps): Promise<HandlerResult | null> {
   const parsed = parseCommit(body);
   if (!parsed.ok) return { status: 422, body: { error: "INVALID_REQUEST", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], issues: parsed.issues, charged: false } };
-  const row = await deps.store.getTrip(parsed.value.trip_id);
+  const row = await getTripOnNetwork(deps, parsed.value.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } };
   const decision = await decideCommit(await gateInput(deps, row, parsed.value), await new DecisionLog(deps.store, row.id, deps.now).prevHash());
   if (decision.outcome === "ACT") return null;
@@ -359,7 +359,7 @@ export async function runCommit(body: unknown, ctx: PaidContext, deps: ServiceDe
   const parsed = parseCommit(body);
   if (!parsed.ok) return { status: 422, body: { error: "INVALID_REQUEST", outcome: "REFUSE", reason_codes: ["INVALID_REQUEST"], issues: parsed.issues } };
   const request = parsed.value;
-  const row = await deps.store.getTrip(request.trip_id);
+  const row = await getTripOnNetwork(deps, request.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } };
   const log = new DecisionLog(deps.store, row.id, deps.now);
   const gate = await decideCommit(await gateInput(deps, row, request), await log.prevHash());

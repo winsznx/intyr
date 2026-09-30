@@ -287,6 +287,28 @@ describe("sandbox supplier policy", () => {
   });
 });
 
+describe("network scope", () => {
+  it("treats a trip prepared on the other network as unknown in every trip-bound route, and does nothing to it", async () => {
+    const s = await setup();
+    const prep = await prepare(s, baseIntent());
+    const tripId = prep.tripId!;
+    const other = { ...s.deps, environment: "MAINNET" as const, allowScenario: false };
+    const body = commitBody(tripId, prep);
+
+    for (const refused of [await precheckCommit(body, other), await precheckRecover({ trip_id: tripId }, other), await precheckRevalidate({ trip_id: tripId }, other)]) {
+      expect(refused).toMatchObject({ status: 404, body: { error: "NOT_FOUND", charged: false } });
+    }
+    expect(await runCommit(body, ctx("POST /v1/trips/commit", body), other)).toMatchObject({ status: 404 });
+    expect(await runRecover({ trip_id: tripId }, ctx("POST /v1/trips/recover", {}), other)).toMatchObject({ status: 404 });
+    expect(await runRevalidate({ trip_id: tripId }, ctx("POST /v1/trips/revalidate", {}), other)).toMatchObject({ status: 404 });
+
+    const untouched = await tripDoc(s, tripId);
+    expect(untouched.state).toBe("PREPARED");
+    expect(await s.store.listAttempts(tripId)).toHaveLength(0);
+    expect(await precheckCommit(body, s.deps)).toBeNull();
+  });
+});
+
 describe("revalidate", () => {
   it("refuses a bad body, an unknown trip and a trip in the wrong state before any charge", async () => {
     const s = await setup();
