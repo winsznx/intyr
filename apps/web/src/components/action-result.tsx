@@ -74,6 +74,13 @@ export function ActionResult({ outcome }: { outcome: ActionOutcome | null }) {
       </Notice>
     );
   }
+  if (error.status === 429) {
+    return (
+      <Notice kind="info" title="This session reached the sandbox limit for the hour.">
+        {body.message ?? "Too many sandbox calls this hour."} Nothing was sent to a supplier and nothing was charged. Try again later in the hour.
+      </Notice>
+    );
+  }
   if (error.code === "NOT_AVAILABLE" || codes.includes("ROUTE_NOT_IMPLEMENTED")) {
     return (
       <Notice kind="refuse" title="Not available in this deployment yet.">
