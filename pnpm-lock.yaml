@@ -150,6 +150,9 @@ importers:
       '@intyr/adapters':
         specifier: workspace:*
         version: link:../adapters
+      '@intyr/chain':
+        specifier: workspace:*
+        version: link:../chain
       '@intyr/core':
         specifier: workspace:*
         version: link:../core
