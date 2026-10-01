@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowLeft, ArrowUpRight, CirclePlay, FileSearch, FlaskConical, Route } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, FileSearch, FlaskConical, Route } from "lucide-react";
 import { ApiError } from "../../lib/api";
 import type { EvidenceRun } from "../../lib/types";
 import type { Resource } from "../../lib/use-resource";
@@ -68,21 +68,7 @@ export function EvidenceIndexPage() {
           runId="campaign-001"
           title="TestNet campaign"
           summary="The same supplier faults against three approaches: a naive agent, an independently written script, and Intyr."
-          notFound={
-            <div className="pf-ev-empty">
-              <p className="pf-ev-empty-title">Results are in the repository</p>
-              <p className="small muted">
-                110 runs per approach on the seeded simulator. The naive agent ended consistent in 36% of runs with 20 duplicate orders, the script in
-                100%, and Intyr in 92% with no duplicates. Intyr lost one cell, where a hotel refused every cancellation, and reported the stranded hotel
-                each time. The API does not serve this campaign yet.
-              </p>
-              <a className="pf-ext" href={CAMPAIGN_RESULTS_URL} target="_blank" rel="noreferrer">
-                Read the campaign results on GitHub
-                <ArrowUpRight aria-hidden />
-                <span className="visually-hidden"> (opens in a new tab)</span>
-              </a>
-            </div>
-          }
+          notFound={<CampaignResults />}
         />
       </div>
     </div>
@@ -95,6 +81,24 @@ const RUN_001 = {
   planId: "pln_357c45b828fabcb25b5e271e",
   paymentTxUrl: "https://allo.info/tx/2MD7RMXDHTLVE76ZNTAOZKZCYEPLF7AIBBOAGZQEO6JOFQLNLVPA",
 };
+
+function CampaignResults() {
+  return (
+    <div className="pf-ev-empty">
+      <p className="pf-ev-empty-title">Results are in the repository</p>
+      <p className="small muted">
+        110 runs per approach on the seeded simulator. The naive agent ended consistent in 36% of runs with 20 duplicate orders, the script in 100%,
+        and Intyr in 92% with no duplicates. Intyr lost one cell, where a hotel refused every cancellation, and reported the stranded hotel each
+        time. The API does not serve this campaign yet.
+      </p>
+      <a className="pf-ext" href={CAMPAIGN_RESULTS_URL} target="_blank" rel="noreferrer">
+        Read the campaign results on GitHub
+        <ArrowUpRight aria-hidden />
+        <span className="visually-hidden"> (opens in a new tab)</span>
+      </a>
+    </div>
+  );
+}
 
 /** The API serves no evidence route for RUN-001, so the card links the records that exist: the plan and its payment. */
 function Run001Links() {
@@ -200,11 +204,6 @@ function EvidenceCardBody({ runId, run }: { runId: string; run: Resource<Evidenc
             Verify its manifest
           </ButtonLink>
         ) : null}
-        {Array.isArray(events) && events.length > 0 ? (
-          <ButtonLink to={`/replay/${encodeURIComponent(runId)}`} variant="quiet" size="sm">
-            Replay
-          </ButtonLink>
-        ) : null}
       </div>
     </>
   );
@@ -223,8 +222,45 @@ function RunStatusChip({ status }: { status: string | undefined }) {
 /* /evidence/:runId                                                    */
 /* ------------------------------------------------------------------ */
 
+const STATIC_RUNS: Record<string, { title: string; summary: string; body: ReactNode }> = {
+  "RUN-001": {
+    title: "Canonical run",
+    summary:
+      "A paid call on Algorand Mainnet: a caller paid for a trip check in USDC over x402, and Intyr returned a signed commit plan anchored on Algorand. The team paid it from its own wallet, so it is labeled INTERNAL_VALIDATION and is not outside adoption.",
+    body: <Run001Links />,
+  },
+  "campaign-001": {
+    title: "TestNet campaign",
+    summary: "A pre-registered campaign on the seeded simulator. A naive agent, an independently written script and Intyr face the same supplier faults, 110 runs each.",
+    body: <CampaignResults />,
+  },
+};
+
 export function EvidenceRunPage() {
   const { runId = "" } = useParams();
+  const known = Object.hasOwn(STATIC_RUNS, runId) ? STATIC_RUNS[runId] : undefined;
+  return known ? <StaticRunPage runId={runId} run={known} /> : <PublishedRunPage runId={runId} />;
+}
+
+/** The API serves no evidence route, so the published runs render from what the repository and the chain already hold. */
+function StaticRunPage({ runId, run }: { runId: string; run: { title: string; summary: string; body: ReactNode } }) {
+  return (
+    <div className="container section-tight pf-page">
+      <Link to="/evidence" className="pf-back">
+        <ArrowLeft aria-hidden />
+        Evidence
+      </Link>
+      <header className="pf-head">
+        <p className="pf-eyebrow">{runId}</p>
+        <h1 className="title-l">{run.title}</h1>
+        <p className="body-l pf-measure">{run.summary}</p>
+      </header>
+      <div className="pf-panel">{run.body}</div>
+    </div>
+  );
+}
+
+function PublishedRunPage({ runId }: { runId: string }) {
   const run = useEvidenceRun(runId);
 
   return (
@@ -247,14 +283,6 @@ export function EvidenceRunPage() {
           </span>
           <h1 className="title-m">{runId} is not published yet</h1>
           <p className="body">The API has no evidence record with this id. Published runs are listed on the evidence page.</p>
-          {runId === "RUN-001" ? <Run001Links /> : null}
-          {runId === "campaign-001" ? (
-            <a className="pf-ext" href={CAMPAIGN_RESULTS_URL} target="_blank" rel="noreferrer">
-              Results are in the repository, run on the seeded simulator
-              <ArrowUpRight aria-hidden />
-              <span className="visually-hidden"> (opens in a new tab)</span>
-            </a>
-          ) : null}
           <ButtonLink to="/evidence" variant="secondary">
             See the evidence
           </ButtonLink>
@@ -309,10 +337,6 @@ function RunDetail({ runId, run }: { runId: string; run: EvidenceRun }) {
               Verify the manifest
             </ButtonLink>
           ) : null}
-          <ButtonLink to={`/replay/${encodeURIComponent(runId)}`} variant="secondary">
-            <CirclePlay aria-hidden />
-            Step through the replay
-          </ButtonLink>
           {tripId ? (
             <ButtonLink to={`/app/trips/${encodeURIComponent(tripId)}`} variant="quiet">
               <Route aria-hidden />

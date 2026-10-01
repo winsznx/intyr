@@ -8,7 +8,7 @@ import { useResource, type Resource } from "../lib/use-resource";
 import { Chip, HashText, Notice, PaymentStateChip } from "./ui";
 
 /*
- * Building blocks shared by the public proof pages (/verify, /evidence, /replay).
+ * Building blocks shared by the public proof pages (/verify, /evidence).
  * Every reader here takes `unknown`, because these pages render whatever the API
  * returned and must never fill a gap with a guess.
  */

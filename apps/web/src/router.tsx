@@ -1,11 +1,10 @@
-import { createBrowserRouter } from "react-router";
+import { Navigate, createBrowserRouter } from "react-router";
 import { AppLayout, PublicLayout } from "./components/shell";
 import { RouteError, NotFound } from "./routes/not-found";
 import { LandingPage } from "./routes/public/landing";
 import { QuickstartPage } from "./routes/public/quickstart";
 import { VerifyPage } from "./routes/public/verify";
 import { EvidenceIndexPage, EvidenceRunPage } from "./routes/public/evidence";
-import { ReplayPage } from "./routes/public/replay";
 import { TripsPage } from "./routes/app/trips";
 import { NewTripPage } from "./routes/app/new-trip";
 import { TripPage } from "./routes/app/trip";
@@ -23,7 +22,7 @@ export const router = createBrowserRouter([
       { path: "/verify/:manifestId", element: <VerifyPage /> },
       { path: "/evidence", element: <EvidenceIndexPage /> },
       { path: "/evidence/:runId", element: <EvidenceRunPage /> },
-      { path: "/replay/:runId", element: <ReplayPage /> },
+      { path: "/replay/*", element: <Navigate to="/evidence" replace /> },
       { path: "*", element: <NotFound /> },
     ],
   },
