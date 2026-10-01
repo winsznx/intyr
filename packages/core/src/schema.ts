@@ -170,7 +170,8 @@ export const RevalidateRequestSchema = TripActionSchema.extend({
 export type RevalidateRequest = z.infer<typeof RevalidateRequestSchema>;
 
 export const RecoverRequestSchema = TripActionSchema.extend({
-  allow_replacement: z.boolean().default(true),
+  /** Replacement legs are not offered in this release, so the default asks for none. */
+  allow_replacement: z.boolean().default(false),
   replacement_headroom_minor: minorUnits.default(0),
 });
 export type RecoverRequest = z.infer<typeof RecoverRequestSchema>;
