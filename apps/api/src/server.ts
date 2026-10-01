@@ -4,6 +4,7 @@ import { ExactAvmScheme } from "@x402/avm/exact/server";
 import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { CHALLENGE_TAG, routePrefix, type NetworkConfig } from "./config";
 import { ROUTE_PRICES } from "./prices";
+import { requestSchemaOf } from "./request-schemas";
 
 const EXAMPLE_HASH = `sha256:${"0".repeat(64)}`;
 
@@ -90,6 +91,7 @@ export function buildRoutes(net: NetworkConfig, payTo: string): Record<string, R
       extensions: declareDiscoveryExtension({
         bodyType: "json",
         input: ex.input,
+        inputSchema: requestSchemaOf(p.key),
         output: { example: ex.output },
       }),
     } as RouteConfig;

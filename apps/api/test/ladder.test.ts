@@ -121,6 +121,14 @@ describe("x402 challenge", () => {
 });
 
 describe("payment ladder", () => {
+  it("publishes the route's request schema in the Bazaar extension of the 402, not an empty object", async () => {
+    const res = await h.app.request(URL_ + "/sandbox/v1/trips/check", { method: "POST" });
+    const pr = decodePaymentRequiredHeader(res.headers.get("payment-required")!) as unknown as { extensions: { bazaar: { schema: { properties: { input: { properties: { body: { properties?: Record<string, unknown>; required?: string[] } } } } } } } };
+    const body = pr.extensions.bazaar.schema.properties.input.properties.body;
+    expect(Object.keys(body.properties ?? {})).toEqual(expect.arrayContaining(["currency", "legs", "limits"]));
+    expect(body.required).toEqual(expect.arrayContaining(["currency", "legs"]));
+  });
+
   it("settles before the handler runs and returns the operation with payment facts", async () => {
     const { res, built } = await pay("/sandbox/v1/trips/check", { legs: [1] });
     expect(res.status).toBe(200);

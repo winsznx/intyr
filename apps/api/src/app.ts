@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import type { ZodType } from "zod";
 import { cors } from "hono/cors";
 import type { Env } from "./env";
 import { CHALLENGE_TAG, routePrefix, type NetworkConfig } from "./config";
@@ -9,12 +8,13 @@ import { getOperation, getSessionById } from "./payments/sessions";
 import { notAvailable, type DomainHandlers, type RouteKey } from "./domain";
 import { mountSandbox, mountSandboxActions } from "./sandbox";
 import { KEY_ID, KEY_VALID_FROM, buildServiceDeps } from "./domain/wire";
-import { CheckRequestSchema, CommitRequestSchema, PublicTripIntentSchema, RecoverRequestSchema, RevalidateRequestSchema, integrityProofState, jsonSchemaOf, publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type SignedRecord } from "@intyr/core";
+import { integrityProofState, publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type SignedRecord } from "@intyr/core";
 import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
 import { checkAnchor } from "./anchor";
 import { anchorAccounts } from "./anchor-accounts";
 import { getRefundBySession, summarize } from "./payments/refunds";
+import { requestSchemaOf } from "./request-schemas";
 
 export interface NetworkDeps {
   net: NetworkConfig;
@@ -70,22 +70,6 @@ function pricesPayload(n: NetworkDeps) {
 function publishedKeys(env: Env): PublishedKey[] {
   if (!env.MANIFEST_SIGNING_JWK) return [];
   return [publishedKey(signingKeyFromJwkJson(KEY_ID, env.MANIFEST_SIGNING_JWK), KEY_VALID_FROM)];
-}
-
-/** Request body schema of each paid route, published in /openapi.json so an agent builder can generate its client from it. */
-const REQUEST_SCHEMAS: Record<string, ZodType> = {
-  "POST /v1/trips/check": CheckRequestSchema,
-  "POST /v1/trips/prepare": PublicTripIntentSchema,
-  "POST /v1/trips/revalidate": RevalidateRequestSchema,
-  "POST /v1/trips/commit": CommitRequestSchema,
-  "POST /v1/trips/recover": RecoverRequestSchema,
-};
-
-function requestSchemaOf(routeKey: string): Record<string, unknown> {
-  const schema = REQUEST_SCHEMAS[routeKey];
-  if (!schema) return { type: "object" };
-  const { $schema: _dialect, ...rest } = jsonSchemaOf(schema);
-  return rest;
 }
 
 /** What verification covers depends on the record. A plan has no roots, a commit manifest has a component root, a transaction manifest adds a decisions root. */
@@ -358,9 +342,19 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         "",
         "## Free",
         `- GET ${origin}/v1/prices`,
+        `- GET ${origin}/v1/capabilities`,
         `- GET ${origin}/v1/payments/{payment_session_id}`,
         `- GET ${origin}/v1/operations/{operation_id}`,
+        `- GET ${origin}/v1/manifests/{manifest_or_plan_id}`,
+        `- POST ${origin}/v1/manifests/verify with {manifest_id}, {txid} or {signed}`,
+        `- GET ${origin}/v1/stats/public`,
         `- GET ${origin}/.well-known/x402`,
+        `- GET ${origin}/.well-known/intyr-signing-keys.json`,
+        `- GET ${origin}/openapi.json`,
+        "",
+        "## Sandbox (TestNet, no USDC moves)",
+        `- POST ${origin}/sandbox/session opens a session. With its cookie, the same five routes under ${origin}/sandbox/v1/trips/... are sponsored by the server, 60 calls an hour per session, 12 new sessions an hour per address.`,
+        `- GET ${origin}/sandbox/v1/demo/scenarios lists seeded failure scenarios, and POST ${origin}/sandbox/v1/demo/run runs one.`,
         "",
         "## Rules an agent should follow",
         "- If a response has payment_state UNKNOWN or status PAYMENT_PENDING, do not pay again. Poll the poll_url.",
