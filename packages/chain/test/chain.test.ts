@@ -76,6 +76,10 @@ describe("networks", () => {
   it("links a transaction to the public explorer", () => {
     expect(explorerTxUrl(NETWORKS.mainnet, TXID)).toBe(`https://allo.info/tx/${TXID}`);
   });
+
+  it("links a TestNet transaction to an explorer domain that resolves", () => {
+    expect(explorerTxUrl(NETWORKS.testnet, TXID)).toBe(`https://lora.algokit.io/testnet/transaction/${TXID}`);
+  });
 });
 
 describe("submitNoteTransaction", () => {
@@ -123,6 +127,14 @@ describe("submitNoteTransaction", () => {
   it("reports a node failure as UNKNOWN rather than as a rejection", async () => {
     const fetchFn = fakeFetch({ ...PARAMS, "POST https://algod.test/v2/transactions": () => json({ message: "busy" }, 503) });
     expect((await submitNoteTransaction(NET, { mnemonic: MNEMONIC }, "intyr:test", { fetch: fetchFn })).state).toBe("UNKNOWN");
+  });
+
+  it("counts a resend that finds the transaction already in the ledger as accepted", async () => {
+    const fetchFn = fakeFetch({
+      ...PARAMS,
+      "POST https://algod.test/v2/transactions": () => json({ message: "TransactionPool.Remember: transaction already in ledger: X" }, 400),
+    });
+    expect((await submitNoteTransaction(NET, { mnemonic: MNEMONIC }, "intyr:test", { fetch: fetchFn })).state).toBe("ACCEPTED");
   });
 
   it("reports a refused transaction as REJECTED", async () => {

@@ -117,6 +117,8 @@ export async function sendPreparedTransaction(
   }
   if (res.ok) return { state: "ACCEPTED", ...ref };
   const detail = (await res.text().catch(() => "")).slice(0, 300);
+  // A resend after a lost response finds the first copy already accepted. That is acceptance, not refusal.
+  if (res.status === 400 && /already in (the )?(ledger|pool|transaction pool)/i.test(detail)) return { state: "ACCEPTED", ...ref };
   // Only a 400 is algod judging the transaction. A quota, rate limit or server fault never looked at it.
   if (res.status === 400) return { state: "REJECTED", status: res.status, reason: detail, ...ref };
   return { state: "UNKNOWN", reason: `algod answered ${res.status}: ${detail}`, ...ref };

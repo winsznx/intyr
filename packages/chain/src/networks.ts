@@ -40,7 +40,7 @@ export const NETWORKS: Readonly<Record<NetworkName, AlgorandNetwork>> = {
     algodUrl: "https://testnet-api.4160.nodely.dev",
     indexerUrl: "https://testnet-idx.4160.nodely.dev",
     fallback: { algodUrl: "https://testnet-api.algonode.cloud", indexerUrl: "https://testnet-idx.algonode.cloud" },
-    explorerTxBase: "https://testnet.allo.info/tx/",
+    explorerTxBase: "https://lora.algokit.io/testnet/transaction/",
   },
 };
 
