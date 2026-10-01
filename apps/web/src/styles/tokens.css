@@ -3,6 +3,10 @@
  * "derived" values are computed for WCAG AA contrast and do not appear in the references.
  */
 :root {
+  /* brand, from the owner's brand kit */
+  --brand-ink: #14212b;
+  --brand-teal: #087f8c;
+
   /* public pages */
   --backdrop: #ebecf0;
   --canvas: #ffffff;

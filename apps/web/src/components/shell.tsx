@@ -8,10 +8,11 @@ import { ButtonLink, cx } from "./ui";
 
 export function Mark({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="9" fill="#0C0C0C" />
-      <path d="M9 11h14M9 16h14M9 21h9" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M21.5 8v16" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" opacity=".55" />
+    <svg className={className} viewBox="7.5 10 51.5 44" aria-hidden>
+      <path d="M10 15H23C29 15 32 19 32 25V39C32 45 35 49 41 49H54" fill="none" stroke="#14212B" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 49H19C25 49 28 45 28 39V25C28 19 31 15 37 15H43" fill="none" stroke="#087F8C" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="49" cy="15" r="5" fill="#087F8C" />
+      <circle cx="54" cy="49" r="5" fill="#14212B" />
     </svg>
   );
 }
@@ -20,7 +21,7 @@ export function Wordmark({ to = "/" }: { to?: string }) {
   return (
     <Link to={to} className="wordmark" aria-label="Intyr home">
       <Mark />
-      <span>Intyr</span>
+      <span>intyr</span>
     </Link>
   );
 }
