@@ -363,38 +363,53 @@ export class DuffelFlightsAdapter implements IntyrAdapter {
     }
   }
 
-  async reconcileByReference(leg: PreparedLeg, _idempotencyRef: string): Promise<PostconditionResult> {
+  /**
+   * Finds our order among the orders for the offer: the hold order by id, an
+   * instant order by the idempotency ref written into its metadata at commit.
+   * With no ref (a postcondition right after a lost response) any order for
+   * the offer counts. More than one match is a possible duplicate, so it stays
+   * UNKNOWN instead of confirming whichever order Duffel listed first.
+   */
+  async reconcileByReference(leg: PreparedLeg, idempotencyRef: string): Promise<PostconditionResult> {
     if (!leg.refs.offer_id) return this.read("UNKNOWN", leg.refs, null, "no offer id to search by");
     try {
       const res = await this.call("GET", `/air/orders?offer_id=${encodeURIComponent(leg.refs.offer_id)}&limit=10`, undefined, READ_TIMEOUT_MS);
       if (res.status !== 200) return this.read("UNKNOWN", leg.refs, null, `order search failed with ${res.status}`);
       const orders = arr(rec(res.body).data).map(rec);
-      const paid = orders.filter((o) => rec(o.payment_status).awaiting_payment !== true || !leg.refs.hold_order_id);
-      if (paid.length === 0) {
+      const holdOrderId = leg.refs.hold_order_id;
+      const ours = orders.filter((o) => {
+        if (holdOrderId) return str(o.id) === holdOrderId;
+        return idempotencyRef === "" || str(rec(o.metadata).intyr_idempotency_ref) === idempotencyRef;
+      });
+      if (ours.length === 0) {
         // Duffel documents that a created order can take hours to appear, so absence is never final here.
-        return this.read("UNKNOWN", leg.refs, null, "no order visible for this offer yet");
+        const others = orders.length > 0 ? `; ${orders.length} order(s) for this offer carry another reference` : "";
+        return this.read("UNKNOWN", leg.refs, null, `no order with this reference is visible yet${others}`);
       }
-      const result = await this.orderResult(paid[0]!, leg.refs, await hashJson(res.body));
-      return paid.length > 1 ? { ...result, detail: `duplicate orders found: ${paid.length}` } : result;
+      if (ours.length > 1) {
+        const ids = ours.map((o) => str(o.id) ?? "?").join(", ");
+        return this.read("UNKNOWN", leg.refs, null, `${ours.length} orders match this reference (${ids}); not choosing one`);
+      }
+      return await this.orderResult(ours[0]!, leg.refs, await hashJson(res.body));
     } catch (err) {
       return this.read("UNKNOWN", leg.refs, null, err instanceof Error ? err.message : "supplier call failed");
     }
   }
 
-  async quoteCancellation(_leg: PreparedLeg, refs: SupplierRefs): Promise<CancelQuote> {
+  async quoteCancellation(leg: PreparedLeg, refs: SupplierRefs): Promise<CancelQuote> {
     const orderId = refs.booking_id ?? refs.hold_order_id;
     const none = (detail: string): CancelQuote => ({ refund: null, fee: null, refund_destination: "UNKNOWN", certainty: "UNKNOWN", valid_until: null, cancellable: false, detail });
     if (!orderId) return none("no order to cancel");
     try {
       const res = await this.call("POST", "/air/order_cancellations", { data: { order_id: orderId } }, READ_TIMEOUT_MS);
       if (res.status !== 201 && res.status !== 200) return none(firstError(res.body).code ?? `cancellation quote failed with ${res.status}`);
-      return this.quoteFrom(rec(rec(res.body).data));
+      return this.quoteFrom(rec(rec(res.body).data), leg.price);
     } catch (err) {
       return none(err instanceof Error ? err.message : "supplier call failed");
     }
   }
 
-  async cancel(_leg: PreparedLeg, refs: SupplierRefs): Promise<CancelResult> {
+  async cancel(leg: PreparedLeg, refs: SupplierRefs): Promise<CancelResult> {
     const respondedAt = (): string => iso(this.clock.now());
     const orderId = refs.booking_id ?? refs.hold_order_id;
     if (!orderId) return { outcome: "REFUSED", refund: null, fee: null, refund_destination: "UNKNOWN", responded_at: respondedAt(), response_hash: null, detail: "no order to cancel" };
@@ -410,11 +425,12 @@ export class DuffelFlightsAdapter implements IntyrAdapter {
       if (!quoteId) return { outcome: "UNKNOWN", refund: null, fee: null, refund_destination: "UNKNOWN", responded_at: respondedAt(), response_hash: null, detail: "quote has no id" };
       const confirmRes = await this.call("POST", `/air/order_cancellations/${encodeURIComponent(quoteId)}/actions/confirm`, undefined, COMMIT_TIMEOUT_MS);
       const confirmed = rec(rec(confirmRes.body).data);
-      const q = this.quoteFrom(confirmRes.status === 200 ? confirmed : quote);
+      const q = this.quoteFrom(confirmRes.status === 200 ? confirmed : quote, leg.price);
       if (confirmRes.status !== 200 || !str(confirmed.confirmed_at)) {
-        return { outcome: "UNKNOWN", refund: q.refund, fee: null, refund_destination: q.refund_destination, responded_at: respondedAt(), response_hash: await hashJson(confirmRes.body), detail: firstError(confirmRes.body).code ?? "cancellation not confirmed" };
+        return { outcome: "UNKNOWN", refund: q.refund, fee: q.fee, refund_destination: q.refund_destination, responded_at: respondedAt(), response_hash: await hashJson(confirmRes.body), detail: firstError(confirmRes.body).code ?? "cancellation not confirmed" };
       }
-      return { outcome: "CANCELLED", refund: q.refund, fee: null, refund_destination: q.refund_destination, responded_at: respondedAt(), response_hash: await hashJson(confirmed), detail: null };
+      const charged = q.fee !== null && q.fee.amount_minor > 0;
+      return { outcome: charged ? "CANCELLED_WITH_CHARGES" : "CANCELLED", refund: q.refund, fee: q.fee, refund_destination: q.refund_destination, responded_at: respondedAt(), response_hash: await hashJson(confirmed), detail: null };
     } catch (err) {
       return { outcome: "UNKNOWN", refund: null, fee: null, refund_destination: "UNKNOWN", responded_at: respondedAt(), response_hash: null, detail: err instanceof Error ? err.message : "supplier call failed" };
     }
@@ -533,15 +549,24 @@ export class DuffelFlightsAdapter implements IntyrAdapter {
     };
   }
 
-  private quoteFrom(q: Record<string, unknown>): CancelQuote {
+  /**
+   * Duffel's cancellation has no fee field, only the refund the fare conditions
+   * allow. The fee is what the leg cost minus that refund. A pay-later order
+   * (refund_to awaiting_payment) was never paid, so it costs nothing to cancel.
+   * Without a refund amount in the leg's currency the fee stays unknown.
+   */
+  private quoteFrom(q: Record<string, unknown>, paid: Money): CancelQuote {
     const refundTo = str(q.refund_to);
     const destination = refundTo === null ? "UNKNOWN" : refundTo === "airline_credits" || refundTo === "voucher" ? "CREDIT" : "CASH";
     const refund: Money | null = q.refund_amount !== null && q.refund_amount !== undefined && str(q.refund_currency)
       ? toMoney(String(q.refund_amount), String(q.refund_currency))
       : null;
+    let fee: Money | null = null;
+    if (refundTo === "awaiting_payment") fee = { amount_minor: 0, currency: paid.currency };
+    else if (refund && refund.currency === paid.currency) fee = { amount_minor: Math.max(0, paid.amount_minor - refund.amount_minor), currency: paid.currency };
     return {
       refund,
-      fee: null,
+      fee,
       refund_destination: destination,
       certainty: refund ? "QUOTED" : "UNKNOWN",
       valid_until: str(q.expires_at),

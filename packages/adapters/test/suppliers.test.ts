@@ -118,13 +118,98 @@ describe("duffel-flights", () => {
     expect((writes[0]!.body as { data: { metadata: Record<string, string> } }).data.metadata.intyr_operation_id).toBe("ops_1");
   });
 
+  const unbookedRefs = { offer_id: "off_0001", hold_order_id: null, prebook_id: null, booking_id: null, booking_reference: null, passenger_ids: [] };
+  const flightLeg = { refs: unbookedRefs, price: { amount_minor: 24560, currency: "USD" } } as unknown as PreparedLeg;
+  const order = (id: string, ref: string | null) => ({
+    id,
+    booking_reference: `REF${id.slice(-1)}`,
+    payment_status: { awaiting_payment: false },
+    cancelled_at: null,
+    total_amount: "245.60",
+    total_currency: "USD",
+    metadata: ref ? { intyr_operation_id: "ops_1", intyr_idempotency_ref: ref } : {},
+  });
+
   it("reconciles by offer id and never treats absence as final", async () => {
     const { fetch } = mockFetch([[/GET .*\/air\/orders\?offer_id=/, 200, { data: [] }]]);
     const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
-    const leg = { refs: { offer_id: "off_0001", hold_order_id: null, prebook_id: null, booking_id: null, booking_reference: null, passenger_ids: [] } } as unknown as PreparedLeg;
-    const read = await adapter.reconcileByReference(leg, "x");
+    const read = await adapter.reconcileByReference(flightLeg, "x");
     expect(read.found).toBe("UNKNOWN");
     expect(read.absent_is_final).toBe(false);
+  });
+
+  it("reconciles to the order carrying our reference, not the first order listed for the offer", async () => {
+    const { fetch } = mockFetch([[/GET .*\/air\/orders\?offer_id=/, 200, { data: [order("ord_9", "someone-else"), order("ord_1", "intyr-abc")] }]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const read = await adapter.reconcileByReference(flightLeg, "intyr-abc");
+    expect([read.found, read.confirmed, read.refs.booking_id]).toEqual(["PRESENT", true, "ord_1"]);
+  });
+
+  it("stays UNKNOWN and names both orders when two carry our reference", async () => {
+    const { fetch } = mockFetch([[/GET .*\/air\/orders\?offer_id=/, 200, { data: [order("ord_1", "intyr-abc"), order("ord_2", "intyr-abc")] }]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const read = await adapter.reconcileByReference(flightLeg, "intyr-abc");
+    expect([read.found, read.confirmed, read.detail]).toEqual(["UNKNOWN", false, "2 orders match this reference (ord_1, ord_2); not choosing one"]);
+  });
+
+  it("does not count an order for the offer that carries another reference", async () => {
+    const { fetch } = mockFetch([[/GET .*\/air\/orders\?offer_id=/, 200, { data: [order("ord_9", null)] }]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const read = await adapter.reconcileByReference(flightLeg, "intyr-abc");
+    expect(read.found).toBe("UNKNOWN");
+  });
+
+  it("reads the single order for the offer when a lost response leaves no reference to match", async () => {
+    const { fetch } = mockFetch([[/GET .*\/air\/orders\?offer_id=/, 200, { data: [order("ord_1", "intyr-abc")] }]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const read = await adapter.postcondition(flightLeg, unbookedRefs);
+    expect([read.found, read.refs.booking_id]).toEqual(["PRESENT", "ord_1"]);
+  });
+
+  const bookedRefs = { ...unbookedRefs, booking_id: "ord_1" };
+  const cancellation = (refund: string | null, refundTo = "balance", confirmedAt: string | null = null) => ({
+    data: { id: "ore_1", order_id: "ord_1", refund_amount: refund, refund_currency: refund === null ? null : "USD", refund_to: refundTo, expires_at: "2026-10-01T13:00:00Z", confirmed_at: confirmedAt },
+  });
+
+  it("quotes the cancellation fee as the leg price minus Duffel's refund", async () => {
+    const { fetch } = mockFetch([[/POST .*\/air\/order_cancellations$/, 201, cancellation("200.00")]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const quote = await adapter.quoteCancellation(flightLeg, bookedRefs);
+    expect([quote.fee, quote.certainty]).toEqual([{ amount_minor: 4560, currency: "USD" }, "QUOTED"]);
+  });
+
+  it("leaves the fee unknown when Duffel gives no refund amount", async () => {
+    const { fetch } = mockFetch([[/POST .*\/air\/order_cancellations$/, 201, cancellation(null)]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const quote = await adapter.quoteCancellation(flightLeg, bookedRefs);
+    expect([quote.fee, quote.certainty]).toEqual([null, "UNKNOWN"]);
+  });
+
+  it("charges nothing to cancel a pay-later order that was never paid", async () => {
+    const { fetch } = mockFetch([[/POST .*\/air\/order_cancellations$/, 201, cancellation("0.00", "awaiting_payment")]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const quote = await adapter.quoteCancellation(flightLeg, bookedRefs);
+    expect(quote.fee).toEqual({ amount_minor: 0, currency: "USD" });
+  });
+
+  it("reports a partial refund as CANCELLED_WITH_CHARGES with the fee", async () => {
+    const { fetch } = mockFetch([
+      [/POST .*\/air\/order_cancellations$/, 201, cancellation("200.00")],
+      [/POST .*\/actions\/confirm/, 200, cancellation("200.00", "balance", "2026-10-01T12:00:05Z")],
+    ]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const result = await adapter.cancel(flightLeg, bookedRefs);
+    expect([result.outcome, result.fee]).toEqual(["CANCELLED_WITH_CHARGES", { amount_minor: 4560, currency: "USD" }]);
+  });
+
+  it("reports a full refund as CANCELLED with a zero fee", async () => {
+    const { fetch } = mockFetch([
+      [/POST .*\/air\/order_cancellations$/, 201, cancellation("245.60")],
+      [/POST .*\/actions\/confirm/, 200, cancellation("245.60", "balance", "2026-10-01T12:00:05Z")],
+    ]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const result = await adapter.cancel(flightLeg, bookedRefs);
+    expect([result.outcome, result.fee]).toEqual(["CANCELLED", { amount_minor: 0, currency: "USD" }]);
   });
 
   it("confirms from an order read with a booking reference and no pending payment", async () => {
