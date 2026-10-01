@@ -145,7 +145,8 @@ The same hash was anchored on TestNet later, in transaction `WHP6YBEIU3B4QR3RMA2
 at round 67823189, with note `intyr:prereg:v1:<hash>`. The anchor was sent from the TestNet payer account. The
 git commit is what predates the runs. The anchor proves the committed file wasn't changed after that round.
 
-Campaign 001 ran three arms, 110 runs each, over eleven fault cells on the seeded simulator: a naive
+Campaign 001 ran three arms, 110 runs each, over eleven cells (ten fault patterns and one healthy control) on
+the seeded simulator: a naive
 sequential agent (B0), a careful independent script (B1) and Intyr over HTTP (T). An auditor read the
 simulator's own order list. Results are in `evidence/campaign-001/RESULTS.md`, worst finding first:
 
@@ -169,13 +170,16 @@ The pre-registered headline, "more reliable than a careful script", is not suppo
 rule, the claim is narrowed to this, quoted from RESULTS.md:
 
 > Under ten documented supplier fault patterns, a naive agent leaves bookings stranded or duplicated in most
-> runs. A careful engineer's script avoids that. Intyr provides the same careful behaviour as one paid call per
-> step, 2.9 calls per trip from the caller's side, with signed manifests and decision records, and it matched
-> that script in ten of eleven cells and lost one.
+> runs. A careful engineer's script avoids that. Intyr provides the same careful behaviour as one call per
+> step, 2.9 calls to Intyr's API per trip from the caller's side, with signed manifests and decision records,
+> and it matched that script in ten of eleven cells and lost one. On the public host each of those calls is
+> paid over x402; in this campaign they were not (see the deviations below).
 
 F10 has no fix yet. Both of its legs look the same at prepare, and nothing in either quote says the hotel will
-refuse to cancel, so no ordering rule can tell them apart without being fitted to this test. The code was not
-changed during the campaign, so these numbers describe the code that ran.
+refuse to cancel, so no ordering rule can tell them apart without being fitted to this test. The ordering rule
+wasn't changed during the campaign. RESULTS.md lists every deviation from the pre-registration: the T arm ran
+on sponsored sessions, so no payment was exercised, and the Worker was redeployed mid-run for changes that
+don't touch simulator trips.
 
 A real-supplier sandbox trip committed cleanly. It's trip `trp_0f0591dc5e1c0d4b920b33a9`, with transaction
 manifest `man_6e12c241db89cf1968e97636`.
@@ -189,7 +193,8 @@ manifest `man_6e12c241db89cf1968e97636`.
 - The commit call took 49 seconds end to end, because both suppliers are slow. An agent needs a long client
   timeout on commit.
 The record verifies with `pnpm --filter @intyr/verifier verify man_6e12c241db89cf1968e97636 --sandbox`
-(`PROOF_PARTIAL`, signed and intact, not yet anchored). Its four decisions are the whole trail: prepare, commit,
+(`PROOF_PARTIAL`: signed and intact, and unanchored because it was made before TestNet anchoring was switched
+on). Its four decisions are the whole trail: prepare, commit,
 and one confirmation per leg.
 
 The first real-supplier sandbox run went wrong, and it's kept as evidence. It's trip `trp_d261cfdcabc61cbc93f83adb`,
@@ -203,7 +208,8 @@ with transaction manifest `man_4fce63d207b53b0a5def9130`.
 - The trip ended `RECOVERY_FAILED`, with 192.36 EUR stranded in the sandbox, and the signed record says so. No
   real money moved.
 The record verifies with `pnpm --filter @intyr/verifier verify man_4fce63d207b53b0a5def9130 --sandbox`. It
-returns `PROOF_PARTIAL`, meaning it's signed and intact but not yet anchored.
+returns `PROOF_PARTIAL`: signed and intact, and unanchored because it was made before TestNet anchoring was
+switched on.
 
 The two causes are fixed. The Duffel search now uses the traveler's age on the travel date, and the LiteAPI
 adapter prefers a refundable rate within the price cap. With a refundable rate, the hotel orders ahead of the

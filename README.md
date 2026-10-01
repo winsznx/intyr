@@ -49,7 +49,7 @@ calls are sponsored.
 
 ```sh
 pnpm install
-pnpm --filter @intyr/example-agent agent check requests/check.json --network mainnet   # pays 0.10 USDC
+AVM_MNEMONIC="<25 words>" pnpm --filter @intyr/example-agent agent check requests/check.json --network mainnet   # pays 0.10 USDC
 pnpm --filter @intyr/example-agent agent check requests/check.json --sandbox           # TestNet USDC
 ```
 
@@ -99,7 +99,7 @@ before settlement, so a request that would be refused is never charged.
 |---|---|
 | x402 payment ladder, TestNet sandbox, commit saga, reconciler, recovery | running at the live URL |
 | Mainnet routes under `/v1` | live. They pay to `EXWYXCAPJ7BUVKANGFMNTALTCTFJNV2AYKB3ERKVVKRXOJJREGQ5NJBKUI` in USDC (ASA 31566704). The first settled payment, `2MD7RMXD...LNLVPA`, was team-paid (`INTERNAL_VALIDATION`). It bought plan `pln_357c45b828fabcb25b5e271e`, which verifies `PROOF_VERIFIED` against its Mainnet anchor |
-| Suppliers | a seeded fault simulator for the demo failures. Duffel test mode and LiteAPI sandbox run live for prepare and revalidate. Their offers score below the readiness bar, so a person approves a real sandbox commit (policy `sandbox-supplier-v1`) |
+| Suppliers | a seeded fault simulator for the demo failures. Duffel test mode and the LiteAPI sandbox run live for prepare, revalidate and commit. Their offers score below the readiness bar, so on the sandbox a person approves the commit first (policy `sandbox-supplier-v1`). On `/v1` the public policy refuses them at commit, and there's no approval route there yet. Bookings are test orders, and ground transfers are simulated |
 | Real bookings | none. No production supplier is connected, and each record states its evidence grade (`SIMULATED`, `CALLER_ASSERTED`, `SUPPLIER_SANDBOX`) |
 | Algorand anchors | enabled on Mainnet and TestNet, from funded anchor accounts published in `/.well-known/intyr-signing-keys.json`. Records created before anchoring was enabled stay unanchored and verify as `PROOF_PARTIAL` |
 | Guarantees | none. Every record carries `assurance.mode: NONE` |
@@ -126,7 +126,8 @@ in a hash-chained decision log. Choosing not to act gets recorded just like acti
 
 ## Evidence
 
-Campaign 001 ran eleven fault cells on the seeded simulator against a naive agent, a careful script and
+Campaign 001 ran eleven cells, ten fault patterns and one healthy control, on the seeded simulator against a
+naive agent, a careful script and
 Intyr, 110 runs each. It was pre-registered in git before any run. The results are in
 [evidence/campaign-001/RESULTS.md](evidence/campaign-001/RESULTS.md), worst finding first.
 

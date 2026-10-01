@@ -13,11 +13,12 @@ ecosystem. The owner opens this pull request from their own GitHub account once 
 3. Put this single line in it:
 
    ```
-   repadd Algorand https://github.com/winsznx/intyr
+   repadd Algorand https://github.com/winsznx/intyr #protocol
    ```
 
-4. Open the pull request with the title `Add Intyr to Algorand` and a one-line description: "Intyr is a
-   payment-bound commit and recovery API for AI agents, paid per action over x402 on Algorand."
+4. Open the pull request with the title `Add Intyr to Algorand ecosystem (x402 Global Challenge)` and a
+   one-line description: "Intyr is a payment-bound commit and recovery API for AI agents, paid per action over
+   x402 on Algorand."
 
 The format comes from the repository README (checked 2026-09-30): migration files live in `migrations/` and are
 named `YYYY-MM-DDThhmmss_description`, and a line reads `repadd <Ecosystem> <GitHub URL> [#tags]`. Tags are
