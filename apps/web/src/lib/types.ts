@@ -179,7 +179,9 @@ export interface Trip {
   total?: Money;
   maximum_total?: Money;
   components: TripComponent[];
+  /** The final manifest once one exists, otherwise the commit manifest, or the plan of a checked trip. */
   manifest_id?: string;
+  /** Hash of the commit manifest (`initial_manifest_id`), which commit and approval are bound to. Never the final manifest's hash. */
   manifest_hash?: string;
   manifest_status?: ManifestStatus;
   manifest_expires_at?: string;

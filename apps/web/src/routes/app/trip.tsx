@@ -21,6 +21,7 @@ import {
 import { api } from "../../lib/api";
 import { algoExplorerTx, formatDateTime, formatMoney } from "../../lib/format";
 import { COMPONENT_TYPE, UNKNOWN_COPY, describeReason, tripState } from "../../lib/labels";
+import { receiptRecord } from "../../lib/receipt";
 import { approvalState, componentNames as names, recoverySentence, sentenceStart } from "../../lib/recovery";
 import type { NextAction, Trip } from "../../lib/types";
 import { useResource } from "../../lib/use-resource";
@@ -448,23 +449,34 @@ function MoneyCard({ trip }: { trip: Trip }) {
 
 function ProofCard({ trip }: { trip: Trip }) {
   const anchor = trip.anchors?.[0];
+  const record = receiptRecord(trip);
   return (
     <section className="card" aria-labelledby="proof-title">
       <div className="card-head">
         <h2 className="card-title" id="proof-title">
           Receipt
         </h2>
-        {trip.manifest_id ? (
-          <Link className="link small" to={`/verify/${trip.manifest_id}`}>
+        {record ? (
+          <Link className="link small" to={`/verify/${record.id}`}>
             Verify
           </Link>
         ) : null}
       </div>
       <dl className="kv card-pad">
         <dt>Manifest</dt>
-        <dd>{trip.manifest_id ? <HashText value={trip.manifest_id} label="manifest id" /> : "Not signed yet"}</dd>
+        <dd>{record ? <HashText value={record.id} label="manifest id" /> : "Not signed yet"}</dd>
         <dt>Manifest hash</dt>
-        <dd>{trip.manifest_hash ? <HashText value={trip.manifest_hash} label="manifest hash" /> : "Not signed yet"}</dd>
+        <dd>
+          {record?.hash ? (
+            <HashText value={record.hash} label="manifest hash" />
+          ) : record ? (
+            <Link className="link" to={`/verify/${record.id}`}>
+              Shown with the proof
+            </Link>
+          ) : (
+            "Not signed yet"
+          )}
+        </dd>
         <dt>Algorand anchor</dt>
         <dd>
           {anchor?.txid ? (
