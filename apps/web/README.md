@@ -9,6 +9,7 @@ pnpm --filter @intyr/web dev        # Vite on :5173, proxies /v1, /sandbox, /.we
 pnpm --filter @intyr/web build      # typecheck, then build to apps/web/dist
 pnpm --filter @intyr/web test       # unit tests (Node, no browser)
 pnpm --filter @intyr/web typecheck
+pnpm --filter @intyr/web og         # re-render public/og.png from og/card.html (needs Google Chrome)
 ```
 
 The dev server proxies API paths to `http://127.0.0.1:8787` (`wrangler dev` in `apps/api`). To develop against the deployed sandbox instead:
@@ -28,7 +29,9 @@ INTYR_API_ORIGIN=https://intyr.timjosh507.workers.dev pnpm --filter @intyr/web d
 | `src/components/trip-rails.tsx` | One rail per leg across the commit boundary |
 | `src/components/recovery-timeline.tsx` | Detect, act and record steps of a recovery, from the decision log |
 | `src/routes/public`, `src/routes/app` | Public pages and sandbox pages |
-| `src/styles/tokens.css` | Design tokens measured from the reference screens, plus contrast-corrected text colors |
+| `src/styles/tokens.css` | Design tokens measured from the reference screens, plus contrast-corrected text colors and the two brand colors |
+| `og/card.html` | Source of the link-preview card. After changing it, re-render and bump `?v=` on `og:image` and `twitter:image` in `index.html`, because X, Meta and Mastodon cache images by URL |
+| `public/` | Brand favicon set (ICO, SVG, apple-touch-icon), manifest icons, `og.png`, `robots.txt` and `site.webmanifest`, copied into `dist/` as is |
 
 ## Rules the code follows
 

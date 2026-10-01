@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intyr</title>
+<style>
+  /* Inter from the web app's own packages: the optical-size cut for the headline, the text cut for the wordmark and small text. */
+  @font-face {
+    font-family: "Inter Display";
+    src: url("../node_modules/@fontsource-variable/inter/files/inter-latin-opsz-normal.woff2") format("woff2-variations");
+    font-weight: 100 900;
+  }
+  @font-face {
+    font-family: "Inter Text";
+    src: url("../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2-variations");
+    font-weight: 100 900;
+  }
+
+  :root {
+    --ink: #14212B;
+    --teal: #087F8C;
+    --paper: #FFFFFF;
+    --muted: #5C6B73;
+    --divider: #D8E3E5;
+  }
+
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body { position: relative; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+  /*
+    The mark, the B and the A all start at x = 80, and the top of the mark sits at y = 80.
+    The route outlines are the mark's geometry at 4x: a 20px stroke and a terminal whose radius equals the stroke.
+    The terminal is centred over the comma that ends the first headline line.
+  */
+  .routes { position: absolute; inset: 0; }
+  .routes path { fill: none; stroke: var(--divider); stroke-width: 20; stroke-linecap: round; }
+  .routes circle { fill: var(--teal); }
+
+  /* The horizontal lockup at 1.5x the brand's 48px spec: 72px mark, 15px gap, 45px wordmark. */
+  .lockup { position: absolute; left: 70.56px; top: 68.75px; width: 220px; height: 72px; }
+  .lockup svg { position: absolute; left: 0; top: 0; }
+  .wordmark {
+    position: absolute; left: 87px; top: 7.63px;
+    font: 650 45px/54px "Inter Text"; letter-spacing: -2.25px; white-space: nowrap;
+  }
+
+  .headline {
+    position: absolute; left: 75.5px; top: 256.81px; margin: 0;
+    font: 580 72px/78px "Inter Display"; letter-spacing: -0.03em; white-space: nowrap;
+  }
+  .support {
+    position: absolute; left: 79.2px; top: 443.09px; margin: 0;
+    font: 450 30px/36px "Inter Text"; letter-spacing: -0.005em; color: var(--muted); white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+  <svg class="routes" width="1200" height="630" viewBox="0 0 1200 630" aria-hidden="true">
+    <path d="M1040 -40V472C1040 532 1076 568 1136 568H1240"/>
+    <path d="M648 -40V80C648 140 684 176 744 176H868"/>
+    <circle cx="868" cy="176" r="20"/>
+  </svg>
+
+  <div class="lockup" role="img" aria-label="intyr">
+    <svg width="72" height="72" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M10 15H23C29 15 32 19 32 25V39C32 45 35 49 41 49H54" fill="none" stroke="#14212B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M10 49H19C25 49 28 45 28 39V25C28 19 31 15 37 15H43" fill="none" stroke="#087F8C" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="49" cy="15" r="5" fill="#087F8C"/>
+      <circle cx="54" cy="49" r="5" fill="#14212B"/>
+    </svg>
+    <span class="wordmark" aria-hidden="true">intyr</span>
+  </div>
+
+  <h1 class="headline">Book every part of the trip,<br>or undo what can be undone.</h1>
+  <p class="support">AI agents pay per step in USDC over x402 on Algorand.</p>
+</body>
+</html>
