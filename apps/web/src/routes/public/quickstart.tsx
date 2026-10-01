@@ -69,8 +69,12 @@ function exampleTrip(now: number): string {
       "leg_id": "flight-1", "type": "FLIGHT",
       "supplier": "example-airline", "offer_ref": "flight-offer-789",
       "price": { "amount_minor": 52000, "currency": "USD" },
-      "preparation_mode": "INSTANT_COMMIT_ONLY", "refundable": false,
-      "clocks": { "price_valid_until": "${hours(6)}" }
+      "preparation_mode": "HARD_HOLD", "refundable": true,
+      "clocks": {
+        "price_valid_until": "${hours(6)}",
+        "inventory_held_until": "${hours(24)}",
+        "void_until": "${hours(48)}"
+      }
     }
   ],
   "limits": { "max_total_minor": 110000, "max_irreversible_minor": 60000 }
