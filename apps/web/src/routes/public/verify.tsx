@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { ApiError, PUBLIC, SANDBOX, api, baseForEnvironment, type ApiBase, type ApiErrorBody, type VerifyBody } from "../../lib/api";
 import { BrowserProofPanel, browserOverride, useBrowserProof, type StoredManifest } from "../../components/browser-proof-panel";
-import { COMPONENT_TYPE, PREPARATION_MODE, PROOF_STATE, describeReason, type Tone } from "../../lib/labels";
+import { COMPONENT_TYPE, PLAN_VERDICT, PREPARATION_MODE, PROOF_STATE, describeReason, type Tone } from "../../lib/labels";
 import { shortId } from "../../lib/format";
 import type { Environment, PreparationMode, ProofState, VerifyResult } from "../../lib/types";
 import { useResource } from "../../lib/use-resource";
@@ -126,6 +126,10 @@ interface ManifestView {
   legs: LegView[];
   payments?: PaymentView[];
   assurance?: string;
+  /** Commit plans only: what Intyr advised, the readiness score against its bar, and the order to commit in. */
+  verdict?: string;
+  readiness?: { score: number; minimum?: number; validated?: boolean };
+  commitOrder?: string[];
 }
 
 function unique(values: Array<string | undefined>): string[] {
@@ -203,7 +207,25 @@ function readManifest(source: unknown): ManifestView {
     legs,
     payments: readManifestPayments(payload),
     assurance: readText(pick(payload, "assurance", "mode")),
+    verdict: readText(pick(payload, "verdict")),
+    readiness: readReadiness(pick(payload, "readiness")),
+    commitOrder: readCommitOrder(pick(payload, "commit_order")),
   };
+}
+
+function readReadiness(value: unknown): ManifestView["readiness"] {
+  if (!isRecord(value) || typeof value.score !== "number") return undefined;
+  return {
+    score: value.score,
+    ...(typeof value.minimum_required === "number" ? { minimum: value.minimum_required } : {}),
+    ...(typeof value.validated === "boolean" ? { validated: value.validated } : {}),
+  };
+}
+
+function readCommitOrder(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids = value.map(readText).filter((id): id is string => id !== undefined);
+  return ids.length ? ids : undefined;
 }
 
 function errorBody(body: unknown): ApiErrorBody {
@@ -638,6 +660,30 @@ function ProofReport({
               ) : null}
               <dt>Trip</dt>
               <dd>{view.tripId ? <code className="pf-code">{view.tripId}</code> : <NotProvided />}</dd>
+              {view.verdict ? (
+                <>
+                  <dt>Verdict</dt>
+                  <dd>
+                    {PLAN_VERDICT[view.verdict]?.label ?? labelFromCode(view.verdict)} <code className="pf-code">{view.verdict}</code>
+                  </dd>
+                </>
+              ) : null}
+              {view.readiness ? (
+                <>
+                  <dt>Readiness</dt>
+                  <dd>
+                    {view.readiness.score}
+                    {view.readiness.minimum !== undefined ? `, at least ${view.readiness.minimum} required` : ""}
+                    {view.readiness.validated === false ? ". Scored by a model that is not validated yet." : ""}
+                  </dd>
+                </>
+              ) : null}
+              {view.commitOrder ? (
+                <>
+                  <dt>Commit order</dt>
+                  <dd>{view.commitOrder.join(", then ")}</dd>
+                </>
+              ) : null}
             </dl>
             {view.kind === "PLAN" ? (
               <Notice kind="review" title="The legs in this plan were reported by the calling agent.">
