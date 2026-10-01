@@ -2,11 +2,18 @@ import { RecoverRequestSchema, makeDecision, parseWith, type TripState } from "@
 import type { HandlerResult, PaidContext } from "../../payments/ladder";
 import type { TripDoc } from "../trip-doc";
 import type { PaidActor } from "../../payments/ladder";
-import { DecisionLog, NOT_TRIP_OWNER, actorOwnsTrip, getTripOnNetwork, type ServiceDeps } from "./context";
+import { COMMIT_LEASE_MS, DecisionLog, NOT_TRIP_OWNER, actorOwnsTrip, getTripOnNetwork, type ServiceDeps } from "./context";
 import { finalizeManifest, performRecovery, RECOVERY_POLICY_VERSION } from "./recover";
 import { httpForOutcome } from "./commit";
 
 const RECOVERABLE: TripState[] = ["RECOVERING", "COMMITTING"];
+
+/** A commit or recovery in progress is not recovered underneath its runner. Once it has gone quiet for the lease it may be. */
+function stillRunning(deps: ServiceDeps, row: { state: string; updated_at: string }): boolean {
+  return RECOVERABLE.includes(row.state as TripState) && deps.now().getTime() - Date.parse(row.updated_at) < COMMIT_LEASE_MS;
+}
+
+const STILL_RUNNING = { error: "COMMIT_ALREADY_STARTED", outcome: "NO_ACTION", reason_codes: ["COMMIT_ALREADY_STARTED"], next_actions: [{ action: "POLL", allowed: true }], message: "This trip is still being committed or recovered. Poll it, and recover only if it stops moving." } as const;
 
 /** Free when there is nothing to recover or the state is unknown: a foreseeable non-action costs nothing. */
 export async function precheckRecover(body: unknown, deps: ServiceDeps, actor: PaidActor): Promise<HandlerResult | null> {
@@ -15,6 +22,7 @@ export async function precheckRecover(body: unknown, deps: ServiceDeps, actor: P
   const row = await getTripOnNetwork(deps, parsed.value.trip_id);
   if (!row) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], charged: false } };
   if (!(await actorOwnsTrip(deps, row, actor))) return { ...NOT_TRIP_OWNER };
+  if (stillRunning(deps, row)) return { status: 409, tripId: row.id, body: { ...STILL_RUNNING, charged: false } };
   const state = row.state as TripState;
   if (RECOVERABLE.includes(state)) return null;
 
@@ -78,6 +86,7 @@ export async function runRecover(body: unknown, ctx: PaidContext, deps: ServiceD
   const owned = await getTripOnNetwork(deps, parsed.value.trip_id);
   if (!owned) return { status: 404, body: { error: "NOT_FOUND", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"] } };
   if (!(await actorOwnsTrip(deps, owned, { ...(ctx.session?.payer ? { payer: ctx.session.payer } : {}), ...(ctx.sandboxSessionId ? { sandboxSessionId: ctx.sandboxSessionId } : {}) }))) return { ...NOT_TRIP_OWNER, feeFailure: "COMMIT_NOT_EXECUTED" };
+  if (stillRunning(deps, owned)) return { status: 409, tripId: owned.id, body: { ...STILL_RUNNING }, feeFailure: "COMMIT_NOT_EXECUTED" };
   const result = await performRecovery(deps, parsed.value.trip_id, { allowReplacement: parsed.value.allow_replacement, headroomMinor: parsed.value.replacement_headroom_minor });
   const row = (await deps.store.getTrip(parsed.value.trip_id))!;
   const doc = JSON.parse(row.doc_json) as TripDoc;
@@ -90,6 +99,7 @@ export async function runRecover(body: unknown, ctx: PaidContext, deps: ServiceD
       trip_id: row.id,
       state: result.finalState,
       outcome: unknown ? "UNKNOWN" : "ACT",
+      replacement_offered: false,
       ...(unknown ? { message: "We have not confirmed the outcome of every component. Do not retry. Intyr is checking and will update this trip." } : {}),
       components: doc.components.map((c) => ({ component_id: c.component_id, state: c.state, cancellation: c.cancellation })),
       stranded_spend_minor: doc.stranded_spend_minor,

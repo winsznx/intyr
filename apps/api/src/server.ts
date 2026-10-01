@@ -24,7 +24,7 @@ export const EXAMPLE_BODIES: Record<string, { input: Record<string, unknown>; ou
           price: { amount_minor: 41000, currency: "USD" },
           preparation_mode: "REVALIDATED",
           refundable: true,
-          clocks: { price_valid_until: "2026-10-05T12:00:00Z", free_cancel_until: "2026-11-01T12:00:00Z", refund_destination: "CASH", refund_amount_certainty: "QUOTED", supplier_can_cancel: true },
+          clocks: { price_valid_until: "2027-06-30T12:00:00Z", free_cancel_until: "2027-09-01T12:00:00Z", refund_destination: "CASH", refund_amount_certainty: "QUOTED", supplier_can_cancel: true },
         },
         {
           leg_id: "flight-1",
@@ -34,7 +34,7 @@ export const EXAMPLE_BODIES: Record<string, { input: Record<string, unknown>; ou
           price: { amount_minor: 52000, currency: "USD" },
           preparation_mode: "INSTANT_COMMIT_ONLY",
           refundable: false,
-          clocks: { price_valid_until: "2026-10-05T12:30:00Z" },
+          clocks: { price_valid_until: "2027-06-30T12:30:00Z" },
           depends_on: ["hotel-1"],
         },
       ],
@@ -47,8 +47,8 @@ export const EXAMPLE_BODIES: Record<string, { input: Record<string, unknown>; ou
       currency: "EUR",
       budget_total_minor: 150000,
       components: [
-        { type: "FLIGHT", origin: "JFK", destination: "LHR", depart_date: "2026-11-10", passengers: 1 },
-        { type: "HOTEL", city: "London", check_in: "2026-11-10", check_out: "2026-11-12", guests: 1 },
+        { type: "FLIGHT", origin: "JFK", destination: "LHR", depart_date: "2027-09-10", passengers: 1 },
+        { type: "HOTEL", city: "London", check_in: "2027-09-10", check_out: "2027-09-12", guests: 1 },
       ],
     },
     output: { trip_id: "trp_0123456789abcdef01234567", state: "PREPARED", manifest_id: "man_example" },
@@ -62,7 +62,7 @@ export const EXAMPLE_BODIES: Record<string, { input: Record<string, unknown>; ou
     output: { trip_id: "trp_0123456789abcdef01234567", state: "COMMITTED" },
   },
   "POST /v1/trips/recover": {
-    input: { trip_id: "trp_0123456789abcdef01234567", allow_replacement: true, replacement_headroom_minor: 0 },
+    input: { trip_id: "trp_0123456789abcdef01234567", allow_replacement: false, replacement_headroom_minor: 0 },
     output: { trip_id: "trp_0123456789abcdef01234567", state: "RECOVERED" },
   },
 };

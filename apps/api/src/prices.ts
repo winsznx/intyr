@@ -1,4 +1,4 @@
-/** USDC has six decimals. Prices are assumptions to be revisited against measured usage, see docs/PRICING.md. */
+/** USDC has six decimals. Prices are initial assumptions to be revisited against measured usage. */
 export interface RoutePrice {
   key: string;
   path: string;
@@ -27,7 +27,7 @@ export const ROUTE_PRICES: RoutePrice[] = [
     path: "/v1/trips/prepare",
     name: "Prepare a trip through supplier adapters",
     description:
-      "Intyr fetches and revalidates each leg from its supplier, labels the evidence grade, and returns a trip with a signed Commit Manifest. Nothing is booked. Suppliers in this release are Duffel test mode and the LiteAPI sandbox, so offers are test offers.",
+      "Intyr fetches and revalidates each leg from its supplier, labels the evidence grade, and returns a trip with a signed Commit Manifest. Nothing is booked. Suppliers in this release are Duffel test mode and the LiteAPI sandbox, so offers are test offers. Ground transfers are simulated.",
     amountAtomic: "250000",
     unique_output: "trip and signed commit manifest with supplier clocks and evidence grades",
     fee_disposition: "kept unless Intyr-side failure, then refunded",
@@ -48,7 +48,7 @@ export const ROUTE_PRICES: RoutePrice[] = [
     path: "/v1/trips/commit",
     name: "Commit a prepared trip",
     description:
-      "Commit the exact manifest hash under a reconcile-before-retry saga. Irreversible legs go last, unknown outcomes are never retried blindly, and the final record is a signed transaction manifest. Suppliers in this release are Duffel test mode and the LiteAPI sandbox, so bookings are test orders, not real travel.",
+      "Commit the exact manifest hash under a reconcile-before-retry saga. Irreversible legs go last, unknown outcomes are never retried blindly, and the final record is a signed transaction manifest. Suppliers in this release are Duffel test mode and the LiteAPI sandbox, so bookings are test orders, not real travel. Ground transfers are simulated.",
     amountAtomic: "500000",
     unique_output: "transaction manifest with per-leg confirmations read back from each supplier",
     fee_disposition: "refunded when the gate refuses after settlement or the commit is not executed; kept otherwise",
@@ -58,7 +58,7 @@ export const ROUTE_PRICES: RoutePrice[] = [
     key: "POST /v1/trips/recover",
     path: "/v1/trips/recover",
     name: "Recover a partially committed trip",
-    description: "Unwind or replace what can be undone inside the limits set before payment and report what cannot. Test-mode bookings only in this release.",
+    description: "Unwind or replace what can be undone inside the limits set before payment and report what cannot. Test-mode bookings only in this release, and replacement is not offered: recovery cancels what can be cancelled.",
     amountAtomic: "250000",
     unique_output: "recovery record with per-leg outcome and realized loss",
     fee_disposition: "kept",

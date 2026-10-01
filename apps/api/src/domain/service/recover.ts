@@ -33,7 +33,7 @@ export interface RecoveryResult {
   decisions: GateDecision[];
 }
 
-function componentToManifest(c: TripComponentDoc): ManifestComponent | null {
+async function componentToManifest(c: TripComponentDoc): Promise<ManifestComponent | null> {
   if (!c.leg) return null;
   const m = toManifestComponent(c.leg, c.state as ComponentState);
   return {
@@ -41,7 +41,7 @@ function componentToManifest(c: TripComponentDoc): ManifestComponent | null {
     ...(c.confirmation
       ? {
           confirmation: {
-            supplier_ref_hash: c.confirmation.response_hash ?? "",
+            supplier_ref_hash: await sha(c.refs),
             postcondition_hash: c.confirmation.response_hash ?? "",
             read_path: "adapter.postcondition",
             read_at: c.confirmation.read_at,
@@ -198,7 +198,7 @@ export async function finalizeManifest(
   const doc = JSON.parse(row.doc_json) as TripDoc;
   const active = await deps.store.getActiveManifest(tripId);
   const decisions = (await deps.store.listDecisions(tripId)) as GateDecision[];
-  const components = doc.components.map(componentToManifest).filter((c): c is ManifestComponent => c !== null);
+  const components = (await Promise.all(doc.components.map(componentToManifest))).filter((c): c is ManifestComponent => c !== null);
   const manifest = await buildTransactionManifest({
     manifest_id: newId("man"),
     trip_id: tripId,

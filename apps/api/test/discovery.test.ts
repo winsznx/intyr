@@ -59,3 +59,22 @@ describe("verify", () => {
     expect(verified).toMatchObject({ integrity: "VALID", proof_state: "PROOF_PARTIAL" });
   });
 });
+
+describe("openapi", () => {
+  it("publishes each paid route's request schema instead of a bare object", async () => {
+    const env = await domainEnv();
+    const domain = createDomain(env, "TESTNET");
+    const app = createApp({ env, version: { name: "t", commit: "t", contract_versions: {} }, testnet: { net: networkConfig("testnet"), payTo: "PAYTO", ladder: (() => new Response("no")) as never, domain: domain.handlers } });
+    const doc = (await (await app.request("https://x.test/openapi.json")).json()) as { paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: { type?: string; required?: string[]; properties?: Record<string, unknown> } } } } } }> };
+    const schemaOf = (path: string) => doc.paths[path]!.post.requestBody.content["application/json"].schema;
+    expect(Object.keys(schemaOf("/sandbox/v1/trips/check").properties ?? {})).toEqual(expect.arrayContaining(["currency", "legs"]));
+    expect(schemaOf("/sandbox/v1/trips/commit").required).toEqual(expect.arrayContaining(["trip_id", "manifest_id", "manifest_hash", "recovery_policy_acknowledged"]));
+    expect(schemaOf("/sandbox/v1/trips/prepare").required).toEqual(expect.arrayContaining(["components", "budget_total_minor"]));
+    expect(JSON.stringify(doc)).not.toContain("json-schema.org/draft");
+  });
+
+  it("links TestNet transactions to an explorer that resolves", () => {
+    expect(networkConfig("testnet").explorerTx("TX1")).toBe("https://lora.algokit.io/testnet/transaction/TX1");
+    expect(networkConfig("mainnet").explorerTx("TX1")).toBe("https://allo.info/tx/TX1");
+  });
+});

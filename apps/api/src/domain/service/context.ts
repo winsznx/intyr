@@ -25,6 +25,9 @@ export async function getTripOnNetwork(deps: Pick<ServiceDeps, "store" | "enviro
   return row && row.network === deps.environment.toLowerCase() ? row : null;
 }
 
+/** A commit or recovery that touched its trip this recently still has a runner. Older than this, nobody is driving it. */
+export const COMMIT_LEASE_MS = 10 * 60_000;
+
 /** What the caller refuses with when a paid action names a trip it does not own. Nothing is charged or run. */
 export const NOT_TRIP_OWNER = { status: 403, body: { error: "NOT_TRIP_OWNER", outcome: "REFUSE", reason_codes: ["TRIP_STATE_CONFLICT"], message: "This trip belongs to another payer or sandbox session.", charged: false } } as const;
 

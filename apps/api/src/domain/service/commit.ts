@@ -132,6 +132,13 @@ function reconcileWindowSeconds(adapter: IntyrAdapter): number {
   return Math.max(3 * adapter.capabilities().visibility_lag_seconds, 300);
 }
 
+/** The tightest price movement the caller allowed, never looser than the public default. */
+async function priceMovePct(deps: ServiceDeps, tripId: string): Promise<number> {
+  const row = await deps.store.getTrip(tripId);
+  const limit = row ? ((JSON.parse(row.doc_json) as TripDoc).intent as { limits?: { max_price_move_pct?: number } } | null)?.limits?.max_price_move_pct : undefined;
+  return Math.min(PUBLIC_DEFAULT_POLICY.max_price_move_pct, limit ?? Number.POSITIVE_INFINITY);
+}
+
 async function confirmComponent(
   deps: ServiceDeps,
   log: DecisionLog,
@@ -150,7 +157,7 @@ async function confirmComponent(
       write: write ? { response: write.response, no_booking_certain: write.no_booking_certain } : null,
       read: post ?? null,
       expected_price: leg.price,
-      price_tolerance_minor: Math.round((leg.price.amount_minor * PUBLIC_DEFAULT_POLICY.max_price_move_pct) / 100),
+      price_tolerance_minor: Math.round((leg.price.amount_minor * (await priceMovePct(deps, tripId))) / 100),
       submitted_at: submittedAt,
       reconcile_window_seconds: reconcileWindowSeconds(adapter),
       policy_version: PUBLIC_DEFAULT_POLICY.policy_version,

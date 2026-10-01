@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { ZodType } from "zod";
 import { cors } from "hono/cors";
 import type { Env } from "./env";
 import { CHALLENGE_TAG, routePrefix, type NetworkConfig } from "./config";
@@ -8,7 +9,7 @@ import { getOperation, getSessionById } from "./payments/sessions";
 import { notAvailable, type DomainHandlers, type RouteKey } from "./domain";
 import { mountSandbox, mountSandboxActions } from "./sandbox";
 import { KEY_ID, KEY_VALID_FROM, buildServiceDeps } from "./domain/wire";
-import { integrityProofState, publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type SignedRecord } from "@intyr/core";
+import { CheckRequestSchema, CommitRequestSchema, PublicTripIntentSchema, RecoverRequestSchema, RevalidateRequestSchema, integrityProofState, jsonSchemaOf, publishedKey, signingKeyFromJwkJson, verifyManifestDocument, type PublishedKey, type Signed, type SignedRecord } from "@intyr/core";
 import { runSponsored, sponsoredSession } from "./sponsored";
 import { TripStore } from "./domain/store";
 import { checkAnchor } from "./anchor";
@@ -69,6 +70,22 @@ function pricesPayload(n: NetworkDeps) {
 function publishedKeys(env: Env): PublishedKey[] {
   if (!env.MANIFEST_SIGNING_JWK) return [];
   return [publishedKey(signingKeyFromJwkJson(KEY_ID, env.MANIFEST_SIGNING_JWK), KEY_VALID_FROM)];
+}
+
+/** Request body schema of each paid route, published in /openapi.json so an agent builder can generate its client from it. */
+const REQUEST_SCHEMAS: Record<string, ZodType> = {
+  "POST /v1/trips/check": CheckRequestSchema,
+  "POST /v1/trips/prepare": PublicTripIntentSchema,
+  "POST /v1/trips/revalidate": RevalidateRequestSchema,
+  "POST /v1/trips/commit": CommitRequestSchema,
+  "POST /v1/trips/recover": RecoverRequestSchema,
+};
+
+function requestSchemaOf(routeKey: string): Record<string, unknown> {
+  const schema = REQUEST_SCHEMAS[routeKey];
+  if (!schema) return { type: "object" };
+  const { $schema: _dialect, ...rest } = jsonSchemaOf(schema);
+  return rest;
 }
 
 const VERIFY_NOTE = "Integrity and timing only. This does not prove the supplier told the truth.";
@@ -339,7 +356,8 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         "## Rules an agent should follow",
         "- If a response has payment_state UNKNOWN or status PAYMENT_PENDING, do not pay again. Poll the poll_url.",
         "- If a response says the supplier outcome is UNKNOWN, do not retry the booking. Intyr reconciles before any retry.",
-        "- Suppliers in this release are sandboxes, caller-supplied offers or seeded simulators. Each leg states its class and evidence grade.",
+        "- Suppliers in this release are sandboxes, caller-supplied offers or seeded simulators. Ground transfers are simulated. Each leg states its class and evidence grade.",
+        "- Recovery cancels what can be cancelled. Replacement is not offered in this release.",
         "- Assurance mode is NONE. Intyr reduces the chance and size of partial bookings and underwrites nothing.",
         "",
       ];
@@ -355,7 +373,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
             summary: p.name,
             description: p.description,
             "x-x402": { price_atomic: p.amountAtomic, asset: primary.net.usdcAssetId, network: primary.net.caip2, tag: CHALLENGE_TAG },
-            requestBody: { required: true, content: { "application/json": { schema: { type: "object" } } } },
+            requestBody: { required: true, content: { "application/json": { schema: requestSchemaOf(p.key) } } },
             responses: {
               "200": { description: "Payment settled and operation completed" },
               "202": { description: "Payment or operation pending. Do not pay again; poll poll_url." },

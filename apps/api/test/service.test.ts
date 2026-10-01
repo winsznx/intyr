@@ -106,6 +106,10 @@ describe("prepare and commit through the simulator", () => {
     expect(check).toEqual({ ok: true });
     expect(signed.payload.final_state).toBe("COMMITTED");
     expect(signed.payload.evidence_banner).toBe("SIMULATED");
+    for (const c of signed.payload.components) {
+      expect(c.confirmation?.supplier_ref_hash, c.component_id).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(c.confirmation?.supplier_ref_hash).not.toBe(c.confirmation?.postcondition_hash);
+    }
   });
 
   it("answers a repeated commit with NO_ACTION for free and makes no second supplier call", async () => {
@@ -335,6 +339,39 @@ describe("trip ownership", () => {
 
     s.clockState.t += 25 * 3600_000;
     expect(await precheckCommit(body, s.deps, { sandboxSessionId: a.id })).toMatchObject({ status: 403 });
+  });
+});
+
+describe("recover while a commit is running", () => {
+  async function committingTrip(s: Awaited<ReturnType<typeof setup>>) {
+    const prep = await prepare(s, baseIntent());
+    const row = (await s.store.getTrip(prep.tripId!))!;
+    await s.store.updateTrip(row.id, row.version, { state: "COMMITTING", doc: JSON.parse(row.doc_json) }, new Date(s.clockState.t).toISOString());
+    return prep.tripId!;
+  }
+
+  it("refuses to recover underneath a live commit, free, and allows it once the commit has gone quiet for the lease", async () => {
+    const s = await setup();
+    const tripId = await committingTrip(s);
+    const refused = await precheckRecover({ trip_id: tripId }, s.deps, OWNER);
+    expect(refused).toMatchObject({ status: 409, body: { error: "COMMIT_ALREADY_STARTED", outcome: "NO_ACTION", charged: false } });
+    const handlerRefusal = await runRecover({ trip_id: tripId }, ctx("POST /sandbox/v1/trips/recover", {}), s.deps);
+    expect(handlerRefusal).toMatchObject({ status: 409, feeFailure: "COMMIT_NOT_EXECUTED" });
+    expect((await tripDoc(s, tripId)).state).toBe("COMMITTING");
+
+    s.clockState.t += 11 * 60_000;
+    expect(await precheckRecover({ trip_id: tripId }, s.deps, OWNER)).toBeNull();
+  });
+
+  it("says replacement is not offered in the recovery answer", async () => {
+    const s = await setup();
+    const prep = await prepare(s, baseIntent([{ component_index: 1, fault: "COMMIT_REJECT" }]));
+    const body = commitBody(prep.tripId!, prep);
+    await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
+    const row = (await s.store.getTrip(prep.tripId!))!;
+    await s.store.updateTrip(row.id, row.version, { state: "RECOVERING", doc: JSON.parse(row.doc_json) }, new Date(s.clockState.t - 11 * 60_000).toISOString());
+    const res = await runRecover({ trip_id: prep.tripId, allow_replacement: true }, ctx("POST /sandbox/v1/trips/recover", {}), s.deps);
+    expect(res.body.replacement_offered).toBe(false);
   });
 });
 

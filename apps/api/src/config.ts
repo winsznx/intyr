@@ -24,7 +24,7 @@ const TESTNET: NetworkConfig = {
   usdcAssetId: "10458941",
   algodUrl: "https://testnet-api.4160.nodely.dev",
   indexerUrl: "https://testnet-idx.4160.nodely.dev",
-  explorerTx: (txid) => `https://testnet.allo.info/tx/${txid}`,
+  explorerTx: (txid) => `https://lora.algokit.io/testnet/transaction/${txid}`,
 };
 
 export function networkConfig(name: NetworkName, env: Pick<Env, "ALGOD_URL" | "INDEXER_URL"> = {}): NetworkConfig {
