@@ -31,3 +31,6 @@ coverage/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# local demo-film workspace (large media and models)
+video/
