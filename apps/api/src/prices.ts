@@ -58,7 +58,7 @@ export const ROUTE_PRICES: RoutePrice[] = [
     key: "POST /v1/trips/recover",
     path: "/v1/trips/recover",
     name: "Recover a partially committed trip",
-    description: "Unwind or replace what can be undone inside the limits set before payment and report what cannot. Test-mode bookings only in this release, and replacement is not offered: recovery cancels what can be cancelled.",
+    description: "Cancel what can be undone inside the limits set before payment and report what cannot. Test-mode bookings only in this release. Replacement is not offered.",
     amountAtomic: "250000",
     unique_output: "recovery record with per-leg outcome and realized loss",
     fee_disposition: "kept",

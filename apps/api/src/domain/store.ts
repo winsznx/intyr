@@ -69,11 +69,12 @@ export class TripStore {
     return this.db.prepare("SELECT * FROM trips WHERE id = ?1").bind(id).first<TripRow>();
   }
 
-  async listTripsByState(states: string[], limit = 25): Promise<TripRow[]> {
+  /** Trips in the given states on one network. A reconciler acts for its own network only. */
+  async listTripsByState(states: string[], limit: number, network: string): Promise<TripRow[]> {
     const ph = states.map((_, i) => `?${i + 1}`).join(",");
     const r = await this.db
-      .prepare(`SELECT * FROM trips WHERE state IN (${ph}) ORDER BY updated_at LIMIT ?${states.length + 1}`)
-      .bind(...states, limit)
+      .prepare(`SELECT * FROM trips WHERE state IN (${ph}) AND network = ?${states.length + 1} ORDER BY updated_at LIMIT ?${states.length + 2}`)
+      .bind(...states, network, limit)
       .all<TripRow>();
     return r.results ?? [];
   }

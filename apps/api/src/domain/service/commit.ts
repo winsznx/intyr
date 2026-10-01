@@ -428,9 +428,9 @@ const STUCK_COMMIT_MS = 5 * 60_000;
 export async function reconcileUnknownTrips(deps: ServiceDeps, session: (tripId: string) => Promise<Parameters<typeof finalizeManifest>[3] | null>): Promise<number> {
   const stuckBefore = deps.now().getTime() - STUCK_COMMIT_MS;
   const rows = [
-    ...(await deps.store.listTripsByState(["COMMIT_STATUS_UNKNOWN"], 20)),
+    ...(await deps.store.listTripsByState(["COMMIT_STATUS_UNKNOWN"], 20, deps.environment.toLowerCase())),
     // A commit whose invocation died mid-saga stays COMMITTING. After the lease the reconciler resumes it the same way.
-    ...(await deps.store.listTripsByState(["COMMITTING"], 20)).filter((r) => Date.parse(r.updated_at) <= stuckBefore),
+    ...(await deps.store.listTripsByState(["COMMITTING"], 20, deps.environment.toLowerCase())).filter((r) => Date.parse(r.updated_at) <= stuckBefore),
   ];
   let resolved = 0;
   for (const row of rows) {

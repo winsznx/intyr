@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CheckRequestSchema, CommitRequestSchema, PublicTripIntentSchema, RecoverRequestSchema, RevalidateRequestSchema, generateSigningKey, parseWith } from "@intyr/core";
+import { CheckRequestSchema, CommitRequestSchema, PublicTripIntentSchema, RecoverRequestSchema, RevalidateRequestSchema, generateSigningKey, parseWith, planTrip } from "@intyr/core";
 import type { ZodType } from "zod";
 import type { Env } from "../src/env";
 import { createApp } from "../src/app";
@@ -31,6 +31,18 @@ describe("discovery examples", () => {
   });
 });
 
+describe("check example", () => {
+  it("is a plan the planner really returns, with the verdict and order the example claims", async () => {
+    const example = EXAMPLE_BODIES["POST /v1/trips/check"]!;
+    const parsed = parseWith(CheckRequestSchema, example.input);
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
+    const plan = await planTrip(parsed.value, { now: new Date(), environment: "MAINNET" });
+    expect(plan.verdict).toBe(example.output.verdict);
+    expect(plan.commit_order).toEqual(example.output.commit_order);
+    expect(plan.decision.outcome).toBe("ACT");
+  });
+});
+
 describe("prepare precheck", () => {
   it("refuses a component type that has no adapter before any charge", async () => {
     const env = await domainEnv();
@@ -55,8 +67,9 @@ describe("verify", () => {
     const body = (await check.json()) as { plan?: { signed?: unknown }; signed?: unknown };
     const signed = body.signed ?? body.plan?.signed ?? body.plan;
     expect(signed).toBeTruthy();
-    const verified = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ signed }) })).json()) as { integrity: string; proof_state: string };
+    const verified = (await (await app.request("https://x.test/sandbox/v1/manifests/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ signed }) })).json()) as { integrity: string; proof_state: string; checked?: string[] };
     expect(verified).toMatchObject({ integrity: "VALID", proof_state: "PROOF_PARTIAL" });
+    expect((verified as { checked?: string[] }).checked).toEqual(["payload_hash", "signature", "anchor_note"]);
   });
 });
 

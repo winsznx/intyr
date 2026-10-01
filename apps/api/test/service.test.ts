@@ -382,6 +382,38 @@ describe("cancellation cost", () => {
   });
 });
 
+describe("reconciler network scope", () => {
+  it("leaves a TestNet trip that has a payment session to the TestNet reconciler, and never finalizes it as Mainnet", async () => {
+    const s = await setup();
+    const prep = await prepare(s, baseIntent([{ component_index: 0, fault: "TIMEOUT_BOOKED" }]));
+    const tripId = prep.tripId!;
+    const body = commitBody(tripId, prep);
+    expect((await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps)).status).toBe(202);
+    s.clockState.t += 120_000;
+
+    const paid = async () => session("POST /sandbox/v1/trips/commit");
+    expect(await reconcileUnknownTrips({ ...s.deps, environment: "MAINNET" }, paid)).toBe(0);
+    const untouched = await tripDoc(s, tripId);
+    expect(untouched.state).toBe("COMMIT_STATUS_UNKNOWN");
+    expect(untouched.doc.final_manifest_id).toBeNull();
+
+    expect(await reconcileUnknownTrips(s.deps, paid)).toBe(1);
+    const final = await tripDoc(s, tripId);
+    expect(final.state).toBe("COMMITTED");
+    const manifest = JSON.parse((await s.store.getManifest(final.doc.final_manifest_id!))!.signed_json) as { payload: { environment: string } };
+    expect(manifest.payload.environment).toBe("TESTNET");
+  });
+
+  it("lists stuck trips of one network only", async () => {
+    const s = await setup();
+    const now = new Date(s.clockState.t).toISOString();
+    const make = (network: string) => s.store.createTrip({ network, owner: "payer:X", state: "COMMIT_STATUS_UNKNOWN", doc: { components: [], next_actions: [] }, now });
+    const [testnet] = await Promise.all([make("testnet"), make("mainnet")]);
+    const rows = await s.store.listTripsByState(["COMMIT_STATUS_UNKNOWN"], 10, "testnet");
+    expect(rows.map((r) => r.id)).toEqual([testnet.id]);
+  });
+});
+
 describe("recover while a commit is running", () => {
   async function committingTrip(s: Awaited<ReturnType<typeof setup>>) {
     const prep = await prepare(s, baseIntent());

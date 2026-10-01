@@ -182,3 +182,32 @@ describe("anchors that never reached a node", () => {
     expect(await store.getAnchor("man_q6")).toMatchObject({ state: "FAILED", error: "could not be submitted within an hour" });
   });
 });
+
+describe("late anchors", () => {
+  it("does not let the commit manifest's anchor replace the final manifest's in the trip document", async () => {
+    const store = new TripStore(createTestD1());
+    const now = new Date().toISOString();
+    const trip = await store.createTrip({
+      network: "testnet",
+      owner: "payer:X",
+      state: "COMMITTED",
+      doc: { components: [], next_actions: [], manifest_id: "man_commit", final_manifest_id: "man_final", anchor: { state: "CONFIRMED", txid: "TX_FINAL", mode: "SEPARATE_NOTE_TRANSACTION" } },
+      now,
+    });
+    const row = (id: string, kind: "COMMIT" | "TRANSACTION") => ({ id, trip_id: trip.id, kind, hash: HASH, status: "ACTIVE" as const, expires_at: null, network: "testnet", signed_json: "{}", now });
+    await store.putManifest(row("man_commit", "COMMIT"));
+    await store.putManifest(row("man_final", "TRANSACTION"));
+    await store.putAnchor({ manifest_id: "man_commit", network: "testnet", mode: "SEPARATE_NOTE_TRANSACTION", txid: "TX_LATE", state: "PENDING", now });
+
+    const chain = chainFake();
+    expect(await reconcileAnchors(store, net, new Date(), chain.fetchFn)).toBe(1);
+    expect((await store.getAnchor("man_commit"))?.state).toBe("CONFIRMED");
+    const doc = JSON.parse((await store.getTrip(trip.id))!.doc_json) as { anchor: { txid: string } };
+    expect(doc.anchor.txid).toBe("TX_FINAL");
+
+    await store.putAnchor({ manifest_id: "man_final", network: "testnet", mode: "SEPARATE_NOTE_TRANSACTION", txid: "TX_FINAL2", state: "PENDING", now });
+    await reconcileAnchors(store, net, new Date(), chain.fetchFn);
+    const after = JSON.parse((await store.getTrip(trip.id))!.doc_json) as { anchor: { txid: string; state: string } };
+    expect(after.anchor).toMatchObject({ txid: "TX_FINAL2", state: "CONFIRMED" });
+  });
+});

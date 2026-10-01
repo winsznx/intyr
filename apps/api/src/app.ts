@@ -88,6 +88,14 @@ function requestSchemaOf(routeKey: string): Record<string, unknown> {
   return rest;
 }
 
+/** What verification covers depends on the record. A plan has no roots, a commit manifest has a component root, a transaction manifest adds a decisions root. */
+function checksFor(schemaVersion: unknown): string[] {
+  const checks = ["payload_hash", "signature"];
+  if (schemaVersion === "commit-manifest/1" || schemaVersion === "transaction-manifest/1") checks.push("component_root");
+  if (schemaVersion === "transaction-manifest/1") checks.push("decisions_root");
+  return checks;
+}
+
 const VERIFY_NOTE = "Integrity and timing only. This does not prove the supplier told the truth.";
 
 export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
@@ -241,9 +249,10 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         manifest_id: typeof payload.manifest_id === "string" ? payload.manifest_id : typeof payload.plan_id === "string" ? payload.plan_id : null,
         environment: typeof payload.environment === "string" ? payload.environment : null,
       };
+      const checks = checksFor(payload.schema_version);
       const result = await verifyManifestDocument(signed as Signed<SignedRecord>, keys);
       if (!result.ok) {
-        return c.json({ ...identity, proof_state: integrityProofState(result), integrity: "INVALID", reason: result.reason, checked: ["payload_hash", "signature", "component_root", "decisions_root"], keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
+        return c.json({ ...identity, proof_state: integrityProofState(result), integrity: "INVALID", reason: result.reason, checked: checks, keys: keys.map((k) => k.key_id), note: VERIFY_NOTE });
       }
       const doc = signed as Signed<SignedRecord>;
       const recordId = "plan_id" in doc.payload ? doc.payload.plan_id : doc.payload.manifest_id;
@@ -255,7 +264,7 @@ export function createApp(deps: AppDeps): Hono<{ Bindings: Env }> {
         proof_state,
         integrity: "VALID",
         anchor: { ...anchor, network: n.net.caip2, ...("txid" in anchor ? { explorer: n.net.explorerTx(anchor.txid) } : {}) },
-        checked: ["payload_hash", "signature", "component_root", "decisions_root", "anchor_note"],
+        checked: [...checks, "anchor_note"],
         keys: keys.map((k) => k.key_id),
         note: VERIFY_NOTE,
       });

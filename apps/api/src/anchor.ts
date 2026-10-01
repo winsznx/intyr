@@ -121,7 +121,8 @@ async function syncTripAnchor(store: TripStore, manifestId: string, txid: string
   const manifest = await store.getManifest(manifestId);
   if (!manifest?.trip_id) return;
   await updateTripDoc(store, manifest.trip_id, now, (doc) => {
-    if (doc.manifest_id !== manifestId && doc.final_manifest_id !== manifestId) return;
+    // The receipt shows the newest record. A late anchor on the commit manifest must not replace the final manifest's.
+    if ((doc.final_manifest_id ?? doc.manifest_id) !== manifestId) return;
     doc.anchor = { state, txid, mode: doc.anchor?.mode ?? "SEPARATE_NOTE_TRANSACTION" };
   });
 }
