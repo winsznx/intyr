@@ -19,9 +19,9 @@ import {
 } from "lucide-react";
 import { ApiError, PUBLIC, SANDBOX, api, baseForEnvironment, type ApiBase, type ApiErrorBody, type VerifyBody } from "../../lib/api";
 import { BrowserProofPanel, browserOverride, useBrowserProof, type StoredManifest } from "../../components/browser-proof-panel";
-import { COMPONENT_TYPE, PROOF_STATE, describeReason, type Tone } from "../../lib/labels";
+import { COMPONENT_TYPE, PREPARATION_MODE, PROOF_STATE, describeReason, type Tone } from "../../lib/labels";
 import { shortId } from "../../lib/format";
-import type { Environment, ProofState, VerifyResult } from "../../lib/types";
+import type { Environment, PreparationMode, ProofState, VerifyResult } from "../../lib/types";
 import { useResource } from "../../lib/use-resource";
 import { Button, ButtonLink, Chip, CopyField, ErrorState, HashText, Notice, Ring, Skeleton, TripStateChip, cx } from "../../components/ui";
 import {
@@ -99,6 +99,10 @@ interface LegView {
   /** SIMULATED, SANDBOX, TEST or LIVE, as signed into the payload. */
   supplierMode?: string;
   faults: string[];
+  /** Plan legs: how firmly the agent's offer was held, and whether Intyr scored it ready. */
+  holdStrength?: string;
+  irreversible?: boolean;
+  readiness?: number;
 }
 
 interface ManifestView {
@@ -140,6 +144,9 @@ function readLegs(components: unknown): LegView[] {
       grade: readText(c.evidence_grade),
       supplierMode: readText(c.supplier_mode),
       faults: unique(faults.map((f) => readText(pick(f, "fault")) ?? readText(f))),
+      holdStrength: readText(c.hold_strength),
+      irreversible: typeof c.irreversible === "boolean" ? c.irreversible : undefined,
+      readiness: typeof c.readiness_score === "number" ? c.readiness_score : undefined,
     };
   });
 }
@@ -162,13 +169,18 @@ function readManifest(source: unknown): ManifestView {
   const payload = pick(signed, "payload") ?? pick(source, "payload");
   const signature = pick(signed, "signature") ?? pick(source, "signature");
   const rawKind = readText(pick(source, "kind")) ?? readText(pick(payload, "schema_version"));
-  const legs = readLegs(pick(payload, "components") ?? pick(payload, "legs"));
+  const kind = rawKind ? KIND_ALIASES[rawKind] : undefined;
+  // A plan's legs are described by the calling agent and never read from a supplier, as the verifier's bannerOf says.
+  const legs = readLegs(pick(payload, "components") ?? pick(payload, "legs")).map((leg) =>
+    kind === "PLAN" && !leg.grade ? { ...leg, grade: "CALLER_ASSERTED" } : leg,
+  );
   const grades = unique(legs.map((leg) => leg.grade));
   const banner = readText(pick(payload, "evidence_banner"));
-  const ownAnchors = readAnchors(pick(source, "anchors"));
+  const servedAnchor = pick(source, "anchor");
+  const ownAnchors = readAnchors(pick(source, "anchors")).concat(isRecord(servedAnchor) && readText(servedAnchor.txid) ? readAnchors([servedAnchor]) : []);
   return {
     id: readText(pick(source, "manifest_id")) ?? readText(pick(payload, "manifest_id")) ?? readText(pick(payload, "plan_id")),
-    kind: rawKind ? KIND_ALIASES[rawKind] : undefined,
+    kind,
     rawKind,
     environment: environmentOf(pick(payload, "environment")) ?? environmentOf(pick(source, "environment")),
     createdAt: readText(pick(payload, "created_at")) ?? readText(pick(source, "created_at")),
@@ -627,7 +639,13 @@ function ProofReport({
               <dt>Trip</dt>
               <dd>{view.tripId ? <code className="pf-code">{view.tripId}</code> : <NotProvided />}</dd>
             </dl>
-            {sandboxSuppliers ? <SupplierScopeBanner /> : null}
+            {view.kind === "PLAN" ? (
+              <Notice kind="review" title="The legs in this plan were reported by the calling agent.">
+                Intyr checked the offers the agent sent and called no supplier, so nothing in this record was read from a supplier.
+              </Notice>
+            ) : sandboxSuppliers ? (
+              <SupplierScopeBanner />
+            ) : null}
             <LegList legs={view.legs} />
           </section>
 
@@ -713,6 +731,10 @@ function ProofReport({
   );
 }
 
+function holdText(mode: string): string {
+  return Object.hasOwn(PREPARATION_MODE, mode) ? `${PREPARATION_MODE[mode as PreparationMode].label}.` : `${labelFromCode(mode)}.`;
+}
+
 function LegList({ legs }: { legs: LegView[] }) {
   if (legs.length === 0) return null;
   return (
@@ -721,7 +743,7 @@ function LegList({ legs }: { legs: LegView[] }) {
         <li key={leg.id ?? `leg-${i}`} className="pf-item">
           <div className="pf-item-head">
             <span className="pf-item-title">
-              {leg.type ? (COMPONENT_TYPE[leg.type] ?? labelFromCode(leg.type)) : `Leg ${i + 1}`}
+              {leg.type ? (COMPONENT_TYPE[leg.type] ?? labelFromCode(leg.type)) : (leg.id ?? `Leg ${i + 1}`)}
               {leg.supplier ? <span className="pf-leg-supplier"> {leg.supplier}</span> : null}
             </span>
             {leg.supplierMode ? (
@@ -734,6 +756,17 @@ function LegList({ legs }: { legs: LegView[] }) {
             {leg.grade ? <GradeChips grades={[leg.grade]} /> : <span className="pf-missing">Evidence grade not provided</span>}
             {leg.legClass ? <code className="pf-code">{leg.legClass}</code> : null}
           </div>
+          {leg.holdStrength || leg.irreversible !== undefined || leg.readiness !== undefined ? (
+            <p className="pf-leg-faults">
+              {[
+                leg.holdStrength ? holdText(leg.holdStrength) : undefined,
+                leg.irreversible === undefined ? undefined : leg.irreversible ? "Cannot be undone once booked." : "Can be cancelled under its terms.",
+                leg.readiness === undefined ? undefined : `Readiness ${leg.readiness} of 100.`,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            </p>
+          ) : null}
           {leg.faults.length > 0 ? (
             <p className="pf-leg-faults">
               Seeded faults:{" "}
