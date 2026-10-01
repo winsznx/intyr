@@ -53,8 +53,8 @@ What is real and what is not, today:
 
 ## Live endpoint
 
-- Host: https://intyr.timjosh507.workers.dev. It's deployed from commit `77f22d7`, which `GET /version` reports.
-  Later commits change only docs and CI.
+- Host: https://intyr.timjosh507.workers.dev. It's deployed from commit `6f6439d`, which `GET /version` reports.
+  Later commits change only docs.
 - Mainnet routes: `POST /v1/trips/{check,prepare,revalidate,commit,recover}`
 - TestNet sandbox routes: `POST /sandbox/v1/trips/{check,prepare,revalidate,commit,recover}`
 - Discovery: `GET /.well-known/x402` (x402 V2, tag `x402-global-challenge`), `GET /llms.txt`,
