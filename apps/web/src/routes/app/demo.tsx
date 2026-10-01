@@ -22,7 +22,7 @@ const SERVER_SCENARIO_TEXT: Record<string, { setup: string; expect: string }> = 
     expect: "The hotel is marked unknown and never retried. About a minute later a supplier read finds the booking and the trip becomes committed. Keep the trip page open to watch it change.",
   },
   "refuse-irreversible": {
-    setup: "One leg cannot be cancelled or refunded, and it is priced above the limit for money that cannot be undone.",
+    setup: "The flight is non-refundable, which drops the trip's readiness below the bar for committing on its own.",
     expect: "Intyr refuses to commit and books nothing.",
   },
 };
@@ -38,7 +38,15 @@ export function DemoPage() {
     setOutcome(null);
     try {
       const run = await api.runDemo(id);
-      navigate(`/app/trips/${run.trip_id}`);
+      if (run.trip_id) {
+        navigate(`/app/trips/${run.trip_id}`);
+        return;
+      }
+      setOutcome(
+        run.prepared?.failures?.length
+          ? { ok: true, action: "DEMO", response: run.prepared }
+          : { ok: false, action: "DEMO", error: new Error("The demo could not prepare its trip, so nothing was committed. Run it again.") },
+      );
     } catch (error) {
       setOutcome({ ok: false, action: "DEMO", error: error instanceof Error ? error : new Error(String(error)) });
     } finally {
@@ -72,7 +80,7 @@ export function DemoPage() {
           <div>
             <h1 className="page-title">Run a trip that goes wrong</h1>
             <p className="muted">
-              Each scenario books a Lisbon trip with a hotel, an airport transfer and a flight. A seeded simulator plays the suppliers, so the same failure
+              Each scenario books a London trip with a hotel, a flight and an airport transfer. A seeded simulator plays the suppliers, so the same failure
               happens every time and you can see what Intyr decided at each step, including the steps where it did nothing.
             </p>
           </div>

@@ -82,9 +82,9 @@ export function scenarioIntent(preset: ScenarioPreset, seed: number = freshSeed(
     currency: "USD",
     budget_total_minor: 250_000,
     components: [
-      { type: "HOTEL", city: "Lisbon", check_in: depart, check_out: checkout, guests: 1 },
-      { type: "GROUND", from: "LIS airport", to: "Lisbon Alfama", pickup_at: `${depart}T14:30:00Z`, passengers: 1 },
-      { type: "FLIGHT", origin: "LHR", destination: "LIS", depart_date: depart, passengers: 1 },
+      { type: "HOTEL", city: "London", check_in: depart, check_out: checkout, guests: 1 },
+      { type: "GROUND", from: "LHR", to: "Central London", pickup_at: `${depart}T18:00:00Z`, passengers: 1 },
+      { type: "FLIGHT", origin: "JFK", destination: "LHR", depart_date: depart, passengers: 1 },
     ],
     limits: { max_total_minor: 250_000, max_price_move_pct: 2 },
     scenario: { seed, faults: preset.faults },

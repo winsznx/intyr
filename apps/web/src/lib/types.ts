@@ -341,9 +341,10 @@ export interface SandboxSession {
   expires_at: string;
 }
 
+/** A run whose prepare did not produce a manifest has no trip_id. Its prepare response comes back as `prepared`. */
 export interface DemoRun {
-  run_id: string;
-  trip_id: string;
+  run_id: string | null;
+  trip_id?: string;
   scenario?: string;
   label?: string;
   final_state?: string;

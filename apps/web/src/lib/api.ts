@@ -168,7 +168,8 @@ export const api = {
     sandbox<ActionResponse>("POST", `/trips/${encodeURIComponent(tripId)}/approve`, body),
   getDemoScenarios: (signal?: AbortSignal): Promise<DemoScenario[]> =>
     sandbox<DemoScenario[] | { scenarios?: DemoScenario[]; items?: DemoScenario[] }>("GET", "/demo/scenarios", undefined, signal).then((r) => (Array.isArray(r) ? r : (r.scenarios ?? r.items ?? []))),
-  runDemo: (scenario: string, seed?: number) => sandbox<DemoRun>("POST", "/demo/run", seed === undefined ? { scenario } : { scenario, seed }),
+  runDemo: (scenario: string, seed?: number) =>
+    sandbox<DemoRun & { prepared?: ActionResponse }>("POST", "/demo/run", seed === undefined ? { scenario } : { scenario, seed }),
 
   getManifest: (manifestId: string, signal?: AbortSignal) => request<ManifestDocument>("GET", `${PUBLIC}/manifests/${encodeURIComponent(manifestId)}`, undefined, signal),
   verifyManifest: (body: VerifyBody, base: ApiBase = PUBLIC) => request<VerifyResult>("POST", `${base}/manifests/verify`, body),
