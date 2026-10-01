@@ -131,7 +131,7 @@ export function ApprovePage() {
               <label className="field">
                 <span className="field-label">Note for the record (optional)</span>
                 <textarea className="input" rows={3} maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} />
-                <span className="field-hint">Stored with your decision in the trip's decision log.</span>
+                <span className="field-hint">Stored with your approval, bound to this manifest's hash.</span>
               </label>
               <ActionResult outcome={outcome} />
               <div className="approve-actions">
