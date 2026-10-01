@@ -32,7 +32,7 @@ const AGENT_ACTION: Record<DecisionOutcome, string> = {
   NO_ACTION: "Nothing to do. Do not call again for the same state.",
   UNKNOWN: "Do not retry. Poll the operation or the trip until it resolves.",
   REFUSE: "Read reason_codes and change the request before calling again.",
-  MANUAL_REVIEW: "Wait. A person approves or rejects the trip in the sandbox session.",
+  MANUAL_REVIEW: "Stop. /v1 has no approval route in this release, so the trip cannot be committed there. In the sandbox, a person approves it in the browser session.",
 };
 
 const OUTCOMES: DecisionOutcome[] = ["ACT", "NO_ACTION", "UNKNOWN", "REFUSE", "MANUAL_REVIEW"];
@@ -294,8 +294,8 @@ if (result.payment_state === "UNKNOWN") {
             <p>Send it without paying first.</p>
             <Code label="curl request" text={curl} />
             <p>
-              Intyr validates the body before it asks for money. A body that fails validation gets 422 with <code>charged: false</code>. A valid body
-              gets 402.
+              An unpaid request gets 402 whatever its body. Intyr validates the body on the paid retry, before it settles the payment: a body that
+              fails gets 422 with <code>charged: false</code>, and the payment is not settled.
             </p>
             <Code label="402 response" text={challenge} />
             <p>
