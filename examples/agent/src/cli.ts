@@ -19,10 +19,10 @@ Commands
   prepare <intent.json>       POST the file to /trips/prepare
 
 Options
-  --network testnet|mainnet   Default testnet
-  --role <name>               Key role in ~/.intyr/keys.json (default testnet_payer). AVM_MNEMONIC overrides it
+  --network testnet|mainnet   Default testnet. testnet calls /sandbox/v1 routes, mainnet calls /v1
+  --role <name>               Key role in ~/.intyr/keys.json (default <network>_payer). AVM_MNEMONIC overrides it
   --base <url>                Default ${DEFAULT_BASE}
-  --sandbox                   Use /sandbox/v1 routes (TestNet) instead of /v1
+  --sandbox                   Same as --network testnet
   --body <file>               JSON body for call
   --max <usd>                 Per-payment cap enforced before signing (default $1)
 `;
@@ -39,8 +39,8 @@ async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
-      network: { type: "string", default: "testnet" },
-      role: { type: "string", default: "testnet_payer" },
+      network: { type: "string" },
+      role: { type: "string" },
       base: { type: "string", default: DEFAULT_BASE },
       sandbox: { type: "boolean", default: false },
       body: { type: "string" },
@@ -53,11 +53,13 @@ async function main(): Promise<void> {
     console.log(USAGE);
     return;
   }
-  const networkName = values.network as NetworkName;
+  if (values.sandbox && values.network !== undefined && values.network !== "testnet") throw new Error("--sandbox means --network testnet");
+  const networkName = (values.network ?? "testnet") as NetworkName;
   if (!(networkName in NETWORKS)) throw new Error(`unknown network ${networkName}`);
   const network = NETWORKS[networkName];
-  const wallet = loadWallet(values.role);
-  const prefix = values.sandbox ? "/sandbox/v1" : "/v1";
+  const wallet = loadWallet(values.role ?? `${networkName}_payer`);
+  // The 402 challenge must match the signer's network: TestNet USDC pays only the sandbox routes.
+  const prefix = networkName === "testnet" ? "/sandbox/v1" : "/v1";
   const url = (path: string): string => `${values.base.replace(/\/$/, "")}${path}`;
 
   switch (command) {

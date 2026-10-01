@@ -5,13 +5,17 @@ A small command-line agent that pays Intyr's endpoints over x402 on Algorand. It
 
 ```sh
 pnpm install
-# Signer: AVM_MNEMONIC, or a role in ~/.intyr/keys.json (default testnet_payer)
+# Signer: AVM_MNEMONIC, or a role in ~/.intyr/keys.json (default <network>_payer)
 pnpm --filter @intyr/example-agent agent balance
 pnpm --filter @intyr/example-agent agent optin                                        # USDC opt-in, needs about 0.2 ALGO
-pnpm --filter @intyr/example-agent agent check requests/check.json --sandbox          # paid on TestNet
-pnpm --filter @intyr/example-agent agent prepare requests/prepare.json --sandbox
+pnpm --filter @intyr/example-agent agent check requests/check.json                    # TestNet USDC, /sandbox/v1
+pnpm --filter @intyr/example-agent agent prepare requests/prepare.json
+pnpm --filter @intyr/example-agent agent check requests/check.json --network mainnet  # Mainnet USDC, /v1
 pnpm --filter @intyr/example-agent agent call GET /v1/prices                          # free route, no payment
 ```
+
+`--network` picks the signer's network and the route prefix together (`testnet` is `/sandbox/v1`, `mainnet` is
+`/v1`), so a TestNet key is never sent against a Mainnet `402`. `--sandbox` still works and means `--network testnet`.
 
 The client refuses any single payment above `--max` (default `$1`) before it signs anything.
 TestNet ALGO comes from https://bank.testnet.algorand.network and TestNet USDC from https://faucet.circle.com.
