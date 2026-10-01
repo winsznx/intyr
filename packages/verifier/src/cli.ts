@@ -51,6 +51,15 @@ export function parseArgs(argv: string[]): CliArgs | { error: string } {
   return args.target ? args : { error: "a manifest id or URL is required" };
 }
 
+/**
+ * The keys to verify against. A pinned key replaces the host's key list
+ * entirely, so a compromised host can't swap the key a record is checked with.
+ */
+export function keysFor(published: PublishedKey[], signedKeyId: string, pinned?: string): PublishedKey[] {
+  if (!pinned) return published;
+  return [{ key_id: signedKeyId, alg: "Ed25519", public_key: pinned, valid_from: "", valid_to: null, revoked: false }];
+}
+
 interface ManifestRead {
   manifest_id: string;
   status?: ManifestStatus;
@@ -81,11 +90,7 @@ export async function main(argv: string[]): Promise<number> {
     const published = await getJson<{ keys: PublishedKey[]; anchor_accounts?: Record<string, string> }>(
       `${host}/.well-known/intyr-signing-keys.json`,
     );
-    const keys = args.key ? published.keys.filter((k) => k.public_key === args.key) : published.keys;
-    if (args.key && keys.length === 0) {
-      console.error(`The host does not publish the pinned key ${args.key}.`);
-      return 1;
-    }
+    const keys = keysFor(published.keys, read.signed.signature.key_id, args.key);
     const anchor = read.anchor?.txid ? { network: read.anchor.network, txid: read.anchor.txid } : null;
     const anchorAccounts =
       anchor && args.anchorAccount ? { ...published.anchor_accounts, [anchor.network]: args.anchorAccount } : published.anchor_accounts;
@@ -97,7 +102,13 @@ export async function main(argv: string[]): Promise<number> {
       ...(anchorAccounts && Object.keys(anchorAccounts).length > 0 ? { anchorAccounts } : {}),
     });
     console.log(args.json ? JSON.stringify(report, null, 2) : renderReport(report, anchor?.network));
-    if (!args.key && !args.json) console.log(`\nKeys were read from ${host}. Pin one with --key to check against an independent copy.`);
+    if (!args.json) {
+      console.log(
+        args.key
+          ? `\nChecked against the pinned key, not the host's key list.`
+          : `\nKeys were read from ${host}. Pin one with --key to check against an independent copy.`,
+      );
+    }
     return report.proof_state === "PROOF_VERIFIED" ? 0 : 1;
   } catch (e) {
     console.error(e instanceof Error ? e.message : String(e));

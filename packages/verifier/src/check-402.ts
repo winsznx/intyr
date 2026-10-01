@@ -28,12 +28,12 @@ export async function main(argv: string[]): Promise<number> {
     console.log(`${host}/.well-known/x402 lists no ${network} paid routes.`);
     return 1;
   }
-  console.log(`${network} paid routes on ${host}, payTo ${payTo ?? (network === "mainnet" ? "NOT UNIQUE" : "not listed")}`);
+  console.log(`${network} paid routes on ${host}, payTo ${payTo ?? "NOT UNIQUE"}`);
   for (const c of checks) {
     const detail = c.ok ? `402, ${Number(c.amount) / 1_000_000} USDC` : `${c.status}: ${c.problems.join(", ")}`;
     console.log(`  ${c.ok ? "PASS" : "FAIL"}  ${new URL(c.url).pathname}  ${detail}`);
   }
-  const passed = (network === "testnet" || payTo !== null) && checks.every((c) => c.ok);
+  const passed = payTo !== null && checks.every((c) => c.ok);
   console.log(passed ? "All paid routes pass." : "Some paid routes fail.");
   return passed ? 0 : 1;
 }

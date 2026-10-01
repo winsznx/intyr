@@ -90,7 +90,9 @@ function scopeOf(record: VerifiableManifest): ProofReport["scope"] {
   return {
     proves: [
       SIGNED,
-      "Its component and decision roots match the records it contains.",
+      record.schema_version === "transaction-manifest/1"
+        ? "Its component and decision roots match the records it contains."
+        : "Its component root matches the components it lists.",
       ANCHORED,
       "Each listed payment is a confirmed USDC transfer with the recorded asset, receiver, amount and payer.",
     ],

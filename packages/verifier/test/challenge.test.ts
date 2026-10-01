@@ -101,6 +101,27 @@ describe("checkChallenge", () => {
   });
 });
 
+describe("checkHostChallenges on the sandbox mirror", () => {
+  it("holds unlisted sandbox routes to the one payTo their own 402s name", async () => {
+    // #given discovery lists only Mainnet routes, and the two sandbox mirrors answer with different payTo values
+    const MAINNET = "algorand:wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=";
+    const discovery = {
+      resources: [
+        { url: `${HOST}/v1/trips/check`, method: "POST", network: MAINNET, payTo: "MAINNETPAYTO" },
+        { url: `${HOST}/v1/trips/prepare`, method: "POST", network: MAINNET, payTo: "MAINNETPAYTO" },
+      ],
+    };
+    const fetchFn: FetchLike = async (url) => {
+      if (url.endsWith("/.well-known/x402")) return new Response(JSON.stringify(discovery), { status: 200 });
+      const payTo = url.includes("/prepare") ? "OTHERPAYTO" : PAY_TO;
+      return new Response("{}", { status: 402, headers: { "payment-required": header({ payTo }) } });
+    };
+
+    // #then there is no single sandbox payTo, so the host fails
+    expect((await checkHostChallenges(HOST, "testnet", fetchFn)).payTo).toBeNull();
+  });
+});
+
 describe("checkHostChallenges", () => {
   it("requires one payTo across every route in the discovery document", async () => {
     const discovery = {

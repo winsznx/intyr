@@ -13,7 +13,7 @@ import {
 } from "@intyr/core";
 import type { FetchLike } from "@intyr/chain";
 import { describe, expect, it } from "vitest";
-import { parseArgs } from "../src/cli";
+import { keysFor, parseArgs } from "../src/cli";
 import { renderReport } from "../src/report";
 import { verifyProof } from "../src/verify";
 
@@ -320,6 +320,26 @@ describe("renderReport for a partial proof", () => {
     expect(renderReport(report)).toContain(
       "PROOF_PARTIAL: Partly verified. The signature and content check out. It has no anchor on Algorand yet, so its timing is unproven.",
     );
+  });
+});
+
+describe("keysFor", () => {
+  it("replaces the host's key list with the pinned key", () => {
+    const hostKeys = [{ key_id: "k", alg: "Ed25519" as const, public_key: "HOST", valid_from: "", valid_to: null, revoked: false }];
+    expect(keysFor(hostKeys, "k", "PINNED").map((k) => [k.key_id, k.public_key])).toEqual([["k", "PINNED"]]);
+  });
+
+  it("uses the host's key list when nothing is pinned", () => {
+    const hostKeys = [{ key_id: "k", alg: "Ed25519" as const, public_key: "HOST", valid_from: "", valid_to: null, revoked: false }];
+    expect(keysFor(hostKeys, "k")).toBe(hostKeys);
+  });
+});
+
+describe("proof scope of a commit manifest", () => {
+  it("claims the component root but not a decision root it does not check", async () => {
+    const { keys, signed } = await signedCommitManifest();
+    const report = await verifyProof({ signed, keys, anchor: null }, { endpoints: ENDPOINTS });
+    expect(report.scope.proves.some((line) => line.includes("decision"))).toBe(false);
   });
 });
 

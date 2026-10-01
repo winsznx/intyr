@@ -156,7 +156,8 @@ export async function checkHostChallenges(
   const listed = doc.resources ?? [];
   const onNetwork = (n: "mainnet" | "testnet") => listed.filter((r) => networkByCaip2(r.network)?.caip2 === NETWORKS[n].caip2);
   const mirrored = onNetwork("mainnet").map((r) => ({ ...r, url: r.url.replace("/v1/", "/sandbox/v1/"), payTo: "" }));
-  const resources = network === "testnet" && onNetwork("testnet").length === 0 ? mirrored : onNetwork(network);
+  const isMirror = network === "testnet" && onNetwork("testnet").length === 0;
+  const resources = isMirror ? mirrored : onNetwork(network);
   const payTos = new Set(resources.map((r) => r.payTo).filter((p) => p !== ""));
   const payTo = payTos.size === 1 ? [...payTos][0]! : null;
   const checks = await Promise.all(
@@ -170,5 +171,8 @@ export async function checkHostChallenges(
       );
     }),
   );
-  return { payTo, checks };
+  if (!isMirror) return { payTo, checks };
+  // Mirrored sandbox routes are not listed with a payTo, so hold them to the one their own 402s name.
+  const observed = new Set(checks.map((c) => c.payTo).filter((p): p is string => p !== undefined));
+  return { payTo: observed.size === 1 ? [...observed][0]! : null, checks };
 }
