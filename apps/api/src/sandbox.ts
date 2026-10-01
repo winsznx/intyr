@@ -1,6 +1,7 @@
 import { SimulatorAdapter } from "@intyr/adapters";
 import type { Context, Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { sha256Hex } from "@intyr/core";
 import { z } from "zod";
 import type { Env } from "./env";
 import { TripStore } from "./domain/store";
@@ -12,6 +13,15 @@ import { updateTripDoc } from "./domain/service/trip-update";
 import type { PaidContext } from "./payments/ladder";
 
 export const SANDBOX_COOKIE = "intyr_sbx";
+
+/** Sessions are free and each one carries 60 sponsored calls an hour, so one address may only open so many. */
+export const SESSIONS_PER_CLIENT_PER_HOUR = 12;
+
+/** A hash of the caller's address. The address is never stored. */
+async function clientHashOf(c: Context): Promise<string> {
+  const address = c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  return (await sha256Hex(`intyr-sandbox:${address}`)).slice(0, 32);
+}
 
 export interface SandboxSession {
   id: string;
@@ -42,7 +52,13 @@ export function mountSandbox(app: Hono<{ Bindings: Env }>, deps: { db: D1Databas
   app.post("/sandbox/session", async (c) => {
     const existing = await readSession(c, store, clock());
     if (existing) return c.json({ session_id: existing.id, expires_at: existing.expires_at, reused: true });
-    const created = await store.createSandboxSession(clock().toISOString());
+    const client = await clientHashOf(c);
+    const since = new Date(clock().getTime() - 3600_000).toISOString();
+    if ((await store.countSessionsFrom(client, since)) >= SESSIONS_PER_CLIENT_PER_HOUR) {
+      c.header("retry-after", "3600");
+      return c.json({ error: "RATE_LIMITED", message: "Too many new sandbox sessions from this address in the last hour. Reuse your existing session or try again later." }, 429);
+    }
+    const created = await store.createSandboxSession(clock().toISOString(), undefined, client);
     setCookie(c, SANDBOX_COOKIE, created.id, {
       httpOnly: true,
       secure: new URL(c.req.url).protocol === "https:",

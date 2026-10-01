@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import type { Env } from "../src/env";
 import { createTestD1 } from "./support/d1";
-import { mountSandbox } from "../src/sandbox";
+import { SESSIONS_PER_CLIENT_PER_HOUR, mountSandbox } from "../src/sandbox";
 import { TripStore } from "../src/domain/store";
 
 function setup() {
@@ -23,6 +23,26 @@ describe("sandbox sessions", () => {
     expect(cookie.toLowerCase()).toContain("samesite=lax");
     const again = await app.request("https://x.test/sandbox/session", { method: "POST", headers: { cookie: cookie.split(";")[0]! } });
     expect(((await again.json()) as { reused: boolean }).reused).toBe(true);
+  });
+
+  it("limits how many sessions one address can open in an hour, without counting a reused session or another address", async () => {
+    const { app } = setup();
+    const open = (ip: string, cookie?: string) => app.request("https://x.test/sandbox/session", { method: "POST", headers: { "cf-connecting-ip": ip, ...(cookie ? { cookie } : {}) } });
+    let first: Response | undefined;
+    for (let i = 0; i < SESSIONS_PER_CLIENT_PER_HOUR; i++) {
+      const res = await open("203.0.113.9");
+      expect(res.status).toBe(201);
+      first ??= res;
+    }
+    const blocked = await open("203.0.113.9");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toBe("3600");
+    expect(await blocked.json()).toMatchObject({ error: "RATE_LIMITED" });
+
+    expect((await open("203.0.113.10")).status).toBe(201);
+    const reused = await open("203.0.113.9", first!.headers.get("set-cookie")!.split(";")[0]!);
+    expect(reused.status).toBe(200);
+    expect(((await reused.json()) as { reused: boolean }).reused).toBe(true);
   });
 
   it("lists only the trips of the calling session, newest first", async () => {

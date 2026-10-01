@@ -243,11 +243,16 @@ export class TripStore {
     return r.results ?? [];
   }
 
-  async createSandboxSession(now: string, ttlMs = 24 * 3600_000): Promise<{ id: string; expires_at: string }> {
+  async createSandboxSession(now: string, ttlMs = 24 * 3600_000, clientHash?: string): Promise<{ id: string; expires_at: string }> {
     const id = newId("evt").replace("evt_", "sbx_");
     const expires = new Date(Date.parse(now) + ttlMs).toISOString();
-    await this.db.prepare("INSERT INTO sandbox_sessions (id, created_at, expires_at, last_seen_at) VALUES (?1,?2,?3,?2)").bind(id, now, expires).run();
+    await this.db.prepare("INSERT INTO sandbox_sessions (id, created_at, expires_at, last_seen_at, client_hash) VALUES (?1,?2,?3,?2,?4)").bind(id, now, expires, clientHash ?? null).run();
     return { id, expires_at: expires };
+  }
+
+  async countSessionsFrom(clientHash: string, sinceIso: string): Promise<number> {
+    const row = await this.db.prepare("SELECT COUNT(*) AS n FROM sandbox_sessions WHERE client_hash = ?1 AND created_at >= ?2").bind(clientHash, sinceIso).first<{ n: number }>();
+    return row?.n ?? 0;
   }
 
   getSandboxSession(id: string): Promise<{ id: string; expires_at: string } | null> {
