@@ -1,6 +1,6 @@
 {
   "trip_ref": "nyc-client-visit",
-  "currency": "USD",
+  "currency": "EUR",
   "budget_total_minor": 150000,
   "components": [
     { "type": "FLIGHT", "origin": "LHR", "destination": "JFK", "depart_date": "2026-11-12", "passengers": 1 },

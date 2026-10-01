@@ -80,6 +80,20 @@ describe("duffel-flights", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("returns NO_OFFER naming Duffel's currencies when no offer is in the requested currency", async () => {
+    const { fetch } = mockFetch([[/POST .*offer_requests/, 201, { data: { offers: [{ ...duffelOffer, total_currency: "EUR" }] } }]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const res = await adapter.prepare({ component_id: "cmp_1", type: "FLIGHT", origin: "LHR", destination: "JFK", depart_date: "2026-11-01", adults: 1, currency: "USD" });
+    expect(res).toEqual({ ok: false, reason: "NO_OFFER", detail: "Duffel priced every offer in EUR, none in USD", retryable: false });
+  });
+
+  it("returns OVER_BUDGET only for an offer in the requested currency above the cap", async () => {
+    const { fetch } = mockFetch([[/POST .*offer_requests/, 201, { data: { offers: [duffelOffer] } }]]);
+    const adapter = new DuffelFlightsAdapter({ token: "duffel_test_x", fetch, clock });
+    const res = await adapter.prepare({ component_id: "cmp_1", type: "FLIGHT", origin: "LHR", destination: "JFK", depart_date: "2026-11-01", adults: 1, currency: "USD", max_price_minor: 10000 });
+    expect(res.ok ? null : res.reason).toBe("OVER_BUDGET");
+  });
+
   it("maps 201, 202, 200, 503, duplicate_booking and 500 without guessing success", async () => {
     const cases: Array<[number, unknown, string, boolean]> = [
       [201, { data: { id: "ord_1", booking_reference: "ABC123", total_amount: "245.60", total_currency: "USD" } }, "RESPONDED_CONFIRMED", false],

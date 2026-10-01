@@ -211,14 +211,18 @@ export class DuffelFlightsAdapter implements IntyrAdapter {
           return { ok: false, reason: "SUPPLIER_ERROR", detail: err.message ?? `offer request failed with ${res.status}`, retryable: res.status >= 500 };
         }
         const currency = req.currency.toUpperCase();
-        const offers = arr(rec(rec(res.body).data).offers)
-          .map(rec)
-          .filter((o) => str(o.total_currency) === currency)
+        const returned = arr(rec(rec(res.body).data).offers).map(rec);
+        const inCurrency = returned.filter((o) => str(o.total_currency) === currency);
+        if (returned.length > 0 && inCurrency.length === 0) {
+          const currencies = [...new Set(returned.map((o) => str(o.total_currency) ?? "unknown"))].join(", ");
+          return { ok: false, reason: "NO_OFFER", detail: `Duffel priced every offer in ${currencies}, none in ${currency}`, retryable: false };
+        }
+        const offers = inCurrency
           .filter((o) => req.max_price_minor === undefined || toMoney(String(o.total_amount), currency).amount_minor <= req.max_price_minor)
           .sort((a, b) => Number.parseFloat(String(a.total_amount)) - Number.parseFloat(String(b.total_amount)));
         offer = offers[0] ?? null;
-        if (!offer && arr(rec(rec(res.body).data).offers).length > 0) {
-          return { ok: false, reason: "OVER_BUDGET", detail: "no offer within the price cap and currency", retryable: false };
+        if (!offer && inCurrency.length > 0) {
+          return { ok: false, reason: "OVER_BUDGET", detail: `no ${currency} offer within the price cap`, retryable: false };
         }
       }
     } catch (err) {
