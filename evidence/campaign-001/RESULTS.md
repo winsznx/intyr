@@ -83,9 +83,9 @@ unwinds. A caller who wants F1 to complete has to accept the new price and commi
 ## Pre-fix pass and harness faults (negative evidence)
 
 - The first T pass ran against Worker 706e15b2, whose unknown-state reconciler skipped every sponsored sandbox
-  trip. There, 2 of 10 F4 trips stayed `COMMIT_STATUS_UNKNOWN` with the hotel booked, and T's consistent rate was
-  97% over 68 runs. That pass is kept, unmerged, in `t-prefix-706e15b2/`. The reconciler was fixed in ede2c708,
-  and the full T arm was rerun against it.
+  trip. There, 2 of 10 F4 trips stayed `COMMIT_STATUS_UNKNOWN` with the hotel booked, and 68 of 70 runs ended
+  consistent (97%). The archive holds 71 records, one of them the excluded run below. That pass is kept, unmerged,
+  in `t-prefix-706e15b2/`. The reconciler was fixed in ede2c708, and the full T arm was rerun against it.
 - The live Worker was redeployed during the rerun (ede2c708, then 4672eef3). The later deploy changed the Duffel
   age fix, sandbox supplier policy, the Mainnet payTo and a LiteAPI rate preference, none of which run in
   simulator trips. TestNet manifest anchoring was switched on during the run, which added about 3 seconds per call
