@@ -19,6 +19,16 @@ import { updateTripDoc } from "./trip-update";
 
 export const RECOVERY_POLICY_VERSION = "public-default-v1";
 
+/**
+ * What a cancellation cost. The supplier's own fee wins. Without one, a refund in the leg's currency means the rest of the price
+ * was kept. With neither, the cost is unknown, which is null and never zero.
+ */
+function cancellationFeeMinor(price: { amount_minor: number; currency: string }, fee: { amount_minor: number } | null, refund: { amount_minor: number; currency: string } | null): number | null {
+  if (fee) return fee.amount_minor;
+  if (refund && refund.currency === price.currency) return Math.max(0, price.amount_minor - refund.amount_minor);
+  return null;
+}
+
 async function sha(value: unknown): Promise<string> {
   return hashValue(canonicalize(JSON.parse(JSON.stringify(value ?? null))));
 }
@@ -76,7 +86,7 @@ export async function performRecovery(deps: ServiceDeps, tripId: string, opts: R
     if (adapter && comp.state === "CONFIRMED") {
       try {
         const q = await adapter.quoteCancellation(leg, comp.refs ?? leg.refs);
-        quote = { cancellable: q.cancellable, fee_minor: q.fee ? q.fee.amount_minor : q.cancellable && q.refund ? 0 : null };
+        quote = { cancellable: q.cancellable, fee_minor: cancellationFeeMinor(leg.price, q.fee, q.refund) };
       } catch {
         quote = null;
       }
@@ -150,7 +160,9 @@ export async function performRecovery(deps: ServiceDeps, tripId: string, opts: R
   const stranded = stillConfirmed.reduce((sum, c) => sum + c.summary.price.amount_minor, 0) + cancelled.reduce((sum, c) => sum + (c.cancellation?.fee_minor ?? 0), 0);
   await updateTripDoc(deps.store, tripId, deps.now().toISOString(), (d) => {
     d.stranded_spend_minor = stranded;
-    d.financial_closure = stranded > 0 ? "OPEN" : "CLOSED";
+    // A cancelled leg whose cost nobody stated is not closed, even when the known loss is zero.
+    const costUnknown = cancelled.some((c) => c.refs?.booking_id && c.cancellation && c.cancellation.fee_minor == null);
+    d.financial_closure = stranded > 0 || costUnknown ? "OPEN" : "CLOSED";
     d.next_actions = finalState === "COMMIT_STATUS_UNKNOWN" ? [{ action: "POLL", allowed: true }] : [{ action: "VERIFY", allowed: true }];
     return { state: finalState };
   });
@@ -171,7 +183,7 @@ async function cancelComponent(
     const result = await adapter.cancel(leg, refs);
     const post = await adapter.postcondition(leg, refs);
     const cancelledRead = post.found === "PRESENT" && post.cancelled;
-    const cancellation = { outcome: result.outcome, refund_minor: result.refund?.amount_minor ?? null, fee_minor: result.fee?.amount_minor ?? null };
+    const cancellation = { outcome: result.outcome, refund_minor: result.refund?.amount_minor ?? null, fee_minor: cancellationFeeMinor(leg.price, result.fee, result.refund) };
     if ((result.outcome === "CANCELLED" || result.outcome === "CANCELLED_WITH_CHARGES") && cancelledRead) {
       return { componentState: "CANCELLED", attemptState: "CONFIRMED", cancellation, detail: result.detail };
     }

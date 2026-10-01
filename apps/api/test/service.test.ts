@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemorySimulatorStore, createAdapters, type IntyrAdapter } from "@intyr/adapters";
+import { MemorySimulatorStore, createAdapters, type IntyrAdapter, type PreparedLeg } from "@intyr/adapters";
 import { generateSigningKey, publishedKey, verifyManifestDocument, type CommitManifest, type GateDecision, type Signed, type TransactionManifest } from "@intyr/core";
 import type { PaymentSession } from "../src/payments/sessions";
 import type { PaidContext } from "../src/payments/ladder";
@@ -339,6 +339,46 @@ describe("trip ownership", () => {
 
     s.clockState.t += 25 * 3600_000;
     expect(await precheckCommit(body, s.deps, { sandboxSessionId: a.id })).toMatchObject({ status: 403 });
+  });
+});
+
+describe("cancellation cost", () => {
+  /** The simulator with its cancel answer rewritten, so the recorded cost comes from what the adapter reports. */
+  function withCancel(adapter: IntyrAdapter, rewrite: (r: Awaited<ReturnType<IntyrAdapter["cancel"]>>, leg: PreparedLeg) => Awaited<ReturnType<IntyrAdapter["cancel"]>>): IntyrAdapter {
+    return new Proxy(adapter, {
+      get(target, prop) {
+        if (prop === "cancel") return async (leg: PreparedLeg, refs: PreparedLeg["refs"]) => rewrite(await target.cancel(leg, refs), leg);
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }
+
+  async function recoveredWith(rewrite: Parameters<typeof withCancel>[1]) {
+    const s = await setup();
+    const real = s.deps.adapters;
+    s.deps.adapters = { get: (id) => real.get(id) && withCancel(real.get(id)!, rewrite), all: () => real.all().map((a) => withCancel(a, rewrite)), forType: (t, o) => { const a = real.forType(t, o); return a && withCancel(a, rewrite); } };
+    const prep = await prepare(s, baseIntent([{ component_index: 1, fault: "COMMIT_REJECT" }]));
+    const body = commitBody(prep.tripId!, prep);
+    await runCommit(body, ctx("POST /sandbox/v1/trips/commit", body), s.deps);
+    return tripDoc(s, prep.tripId!);
+  }
+
+  it("charges the unrefunded part of the price as the cost when a refund comes back without a fee", async () => {
+    const { state, doc } = await recoveredWith((r, leg) => ({ ...r, outcome: "CANCELLED_WITH_CHARGES", fee: null, refund: { amount_minor: Math.round(leg.price.amount_minor / 2), currency: leg.price.currency } }));
+    expect(state).toBe("RECOVERED");
+    const cancelled = doc.components.filter((c) => c.cancellation);
+    expect(cancelled.length).toBeGreaterThan(0);
+    for (const c of cancelled) expect(c.cancellation!.fee_minor).toBe(c.summary.price.amount_minor - Math.round(c.summary.price.amount_minor / 2));
+    expect(doc.stranded_spend_minor).toBeGreaterThan(0);
+    expect(doc.financial_closure).toBe("OPEN");
+  });
+
+  it("does not read an unknown cancellation cost as zero loss on a closed trip", async () => {
+    const { doc } = await recoveredWith((r) => ({ ...r, fee: null, refund: null }));
+    expect(doc.components.filter((c) => c.cancellation).every((c) => c.cancellation!.fee_minor === null)).toBe(true);
+    expect(doc.stranded_spend_minor).toBe(0);
+    expect(doc.financial_closure).toBe("OPEN");
   });
 });
 
