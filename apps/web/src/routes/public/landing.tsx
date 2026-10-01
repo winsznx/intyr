@@ -243,8 +243,8 @@ function HowItWorks() {
             </h2>
           </div>
           <p className="body-l">
-            Intyr gives an agent the commit and recovery behavior a careful engineer would write, as paid x402 calls, and matched such a script in
-            ten of eleven campaign cells. Each step returns a decision the agent can branch on and a signed receipt.
+            Intyr gives an agent the commit and recovery behavior a careful engineer would write, as x402 calls, and matched such a script in ten of
+            eleven campaign cells. Each step returns a decision the agent can branch on and a signed receipt.
           </p>
         </div>
         <LandingSteps />
@@ -253,11 +253,11 @@ function HowItWorks() {
   );
 }
 
-/** Figures from evidence/campaign-001/RESULTS.md. The claim is the narrowed one that document states, quoted as written. */
+/** Figures from evidence/campaign-001/RESULTS.md. The claim quotes that document's narrowed claim up to "lost one", then says the calls were sponsored. */
 const CAMPAIGN_ARMS = [
   { name: "Naive agent", duplicates: "20", work: "3.6 supplier calls per trip", consistent: "36%" },
   { name: "Careful script", duplicates: "0", work: "8.7 supplier calls per trip, and 431 lines of the caller's own code", consistent: "100%" },
-  { name: "Intyr", duplicates: "0", work: "2.9 calls to Intyr per trip", consistent: "92%" },
+  { name: "Intyr", duplicates: "0", work: "2.9 calls to Intyr's API per trip", consistent: "92%" },
 ];
 
 function Results() {
@@ -273,8 +273,9 @@ function Results() {
           </div>
           <p className="body-l">
             Under ten documented supplier fault patterns, a naive agent leaves bookings stranded or duplicated in most runs. A careful engineer's script
-            avoids that. Intyr provides the same careful behaviour as one paid call per step, 2.9 calls per trip from the caller's side, with signed
-            manifests and decision records, and it matched that script in ten of eleven cells and lost one.
+            avoids that. Intyr provides the same careful behaviour as one call per step, 2.9 calls to Intyr's API per trip from the caller's side, with
+            signed manifests and decision records, and it matched that script in ten of eleven cells and lost one. The campaign ran on sponsored
+            sandbox sessions, so none of those calls was paid over x402.
           </p>
         </div>
 
