@@ -2,7 +2,7 @@
 
 The web app is the reference client and oversight console for the Intyr API. The product is the x402-paid API. The UI shows what the API decided and why, and never shows more than the server recorded. It is served by the same Cloudflare Worker as the API, so the landing page, the sandbox and the verifier share one origin with the paid routes.
 
-Screenshots of live sandbox runs of every demo scenario are in [docs/evidence/ui](evidence/ui). They were captured on 2026-09-30 against the deployed TestNet sandbox with seeded simulated suppliers.
+Screenshots of live sandbox runs are in [docs/evidence/ui](evidence/ui). They were captured on 2026-10-01 against the deployed Worker at commit 99a3775: every demo scenario on seeded simulated suppliers, and one trip on Duffel and LiteAPI in test mode that a person approved before Intyr committed it (`trip-real-suppliers-*.png`).
 
 ## Routes
 
