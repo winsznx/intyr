@@ -5,7 +5,8 @@ in USDC over [x402](https://x402.org) on Algorand, with no account. Intyr commit
 When a supplier fails partway through, Intyr unwinds what can still be undone and reports exactly what
 cannot. Each step ends in a signed record, anchored on Algorand, that anyone can check.
 
-Live: https://intyr.timjosh507.workers.dev. Built for the Algorand Global x402 Challenge.
+Live: https://intyr.timjosh507.workers.dev. Demo video: https://youtu.be/wXOa61fzP5w. Built for the Algorand
+Global x402 Challenge.
 
 ## The problem
 

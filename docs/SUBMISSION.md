@@ -219,7 +219,7 @@ before the hotel here.
 
 ## Demo video
 
-`[OWNER: video link, 3 to 5 minutes]`. The script is in `docs/VIDEO_SCRIPT.md`.
+https://youtu.be/wXOa61fzP5w (3:58). The script is in `docs/VIDEO_SCRIPT.md`.
 
 ## Repository
 
