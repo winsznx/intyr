@@ -53,7 +53,7 @@ What is real and what is not, today:
 
 ## Live endpoint
 
-- Host: https://intyr.timjosh507.workers.dev. It's deployed from commit `99a3775`, which `GET /version` reports.
+- Host: https://intyr.timjosh507.workers.dev. It's deployed from commit `77f22d7`, which `GET /version` reports.
   Later commits change only docs and CI.
 - Mainnet routes: `POST /v1/trips/{check,prepare,revalidate,commit,recover}`
 - TestNet sandbox routes: `POST /sandbox/v1/trips/{check,prepare,revalidate,commit,recover}`
