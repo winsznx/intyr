@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import { ArrowUpRight, Check, Clock3, Globe } from "lucide-react";
-import { ApiError, api } from "../lib/api";
+import { ApiError } from "../lib/api";
 import { EVIDENCE_GRADE, humanize, type Tone } from "../lib/labels";
 import { algoExplorerTx, formatDateTime } from "../lib/format";
-import type { Environment, EvidenceGrade, EvidenceRun } from "../lib/types";
-import { useResource, type Resource } from "../lib/use-resource";
+import type { Environment, EvidenceGrade } from "../lib/types";
 import { Chip, HashText, Notice, PaymentStateChip } from "./ui";
 
 /*
@@ -246,10 +245,6 @@ export function isNotFound(error: unknown): boolean {
 
 export function isNotAvailable(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 503 || error.code === "NOT_AVAILABLE");
-}
-
-export function useEvidenceRun(runId: string): Resource<EvidenceRun> {
-  return useResource(`evidence:${runId}`, (signal) => api.getEvidenceRun(runId, signal), { enabled: runId !== "" });
 }
 
 export interface RunEventView {

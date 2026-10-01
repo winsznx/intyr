@@ -2,7 +2,6 @@ import type {
   DemoRun,
   DemoScenario,
   Environment,
-  EvidenceRun,
   GateDecision,
   ManifestDocument,
   NextAction,
@@ -190,7 +189,6 @@ export const api = {
   },
   getPrices: (base: ApiBase = PUBLIC, signal?: AbortSignal) => request<PriceTable>("GET", `${base}/prices`, undefined, signal),
   getStats: (signal?: AbortSignal) => request<PublicStats>("GET", `${PUBLIC}/stats/public`, undefined, signal),
-  getEvidenceRun: (runId: string, signal?: AbortSignal) => request<EvidenceRun>("GET", `${PUBLIC}/evidence/runs/${encodeURIComponent(runId)}`, undefined, signal),
   getVersion: (signal?: AbortSignal) => request<VersionInfo>("GET", "/version", undefined, signal),
   getSigningKeys: (signal?: AbortSignal) => request<{ keys: Array<{ key_id: string; public_key: string; revoked?: boolean }> }>("GET", "/.well-known/intyr-signing-keys.json", undefined, signal),
 };

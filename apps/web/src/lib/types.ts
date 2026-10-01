@@ -320,22 +320,6 @@ export interface PublicStats {
   as_of?: string;
 }
 
-export interface EvidenceRun {
-  run_id: string;
-  label?: string;
-  environment?: Environment;
-  created_at?: string;
-  status?: string;
-  trip_id?: string;
-  manifest_id?: string;
-  scenario?: string;
-  supplier_mode?: string;
-  payments?: Array<{ txid: string; amount?: string; network?: string; payer_class?: string }>;
-  anchors?: AnchorRef[];
-  events?: Array<{ at: string; type: string; detail?: string; hash?: string }>;
-  limitations?: string[];
-}
-
 export interface SandboxSession {
   session_id: string;
   expires_at: string;
