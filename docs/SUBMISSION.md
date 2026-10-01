@@ -1,5 +1,7 @@
 # Intyr: Algorand Global x402 Challenge submission
 
+As submitted on 2026-09-30. Later changes: [POST_SUBMISSION.md](POST_SUBMISSION.md).
+
 This file holds the answers for the submission form. Every line is either true of the running system today or
 marked `[OWNER]` where only the owner can supply it. Update the marked lines before submitting. Do not
 replace them with guesses.
@@ -53,8 +55,8 @@ What is real and what is not, today:
 
 ## Live endpoint
 
-- Host: https://intyr.timjosh507.workers.dev. It's deployed from commit `6f6439d`, which `GET /version` reports.
-  Later commits change only docs.
+- Host: https://intyr.timjosh507.workers.dev. `GET /version` reports the commit it runs, and every deploy after
+  submission is listed in [POST_SUBMISSION.md](POST_SUBMISSION.md).
 - Mainnet routes: `POST /v1/trips/{check,prepare,revalidate,commit,recover}`
 - TestNet sandbox routes: `POST /sandbox/v1/trips/{check,prepare,revalidate,commit,recover}`
 - Discovery: `GET /.well-known/x402` (x402 V2, tag `x402-global-challenge`), `GET /llms.txt`,
