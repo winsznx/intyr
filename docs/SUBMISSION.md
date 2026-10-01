@@ -131,8 +131,9 @@ pnpm --filter @intyr/verifier verify pln_357c45b828fabcb25b5e271e       # RUN-00
 pnpm --filter @intyr/verifier verify <manifest_id> --sandbox            # any sandbox record; --key <x> pins the key
 ```
 
-The verifier checks the Ed25519 signature against the published key. For manifests, it then checks the payload
-hash and the component and decision Merkle roots. It reads the anchor note from a public Algorand indexer, and
+The verifier checks the Ed25519 signature and the payload hash against the published key. It recomputes the
+component root of a manifest and the decision root of a transaction manifest. A plan has neither root. It reads
+the anchor note from a public Algorand indexer, and
 matches every listed payment against the USDC transfer on chain. It exits 0 only for `PROOF_VERIFIED`. Any
 other state, such as `PROOF_PARTIAL` for an unanchored sandbox record, exits 1, and pnpm then prints
 `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`. That line is pnpm passing on the exit code, not a crash.

@@ -66,8 +66,9 @@ pnpm --filter @intyr/verifier verify <manifest_id> --sandbox            # any sa
 ```
 
 The verifier checks the Ed25519 signature against the published key at
-`/.well-known/intyr-signing-keys.json` and recomputes the payload hash and Merkle roots. It then reads the
-anchor note and every listed USDC payment from public Algorand nodes. It never asks Intyr's server whether a
+`/.well-known/intyr-signing-keys.json` and recomputes the payload hash. It also recomputes the component root
+of a manifest and the decision root of a transaction manifest. It then reads the anchor note and every listed
+USDC payment from public Algorand nodes. It never asks Intyr's server whether a
 record is valid. Pass `--key` to pin the key from a source you trust, and `--json` for the full report. It
 exits 0 only for `PROOF_VERIFIED`. Any other state exits 1, and pnpm then prints
 `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`, which is pnpm passing on the exit code, not a crash. The public page
@@ -139,8 +140,9 @@ Intyr, 110 runs each. It was pre-registered in git before any run. The results a
   Intyr.
 
 The pre-registered headline, "more reliable than a careful script", is not supported. The claim that stands is
-that Intyr gives an agent the careful script's behaviour as one paid call per step, 2.9 calls per trip, with
-signed records, and matched it in ten of eleven cells.
+that Intyr gives an agent the careful script's behaviour as one call per step, 2.9 calls to Intyr's API per
+trip, with signed records, and matched it in ten of eleven cells. On the public host each of those calls is
+paid over x402. In the campaign they ran on sponsored sandbox sessions.
 
 A real-supplier sandbox trip (record `man_6e12c241db89cf1968e97636`) committed cleanly. A person approved it,
 then Duffel test mode and the LiteAPI sandbox each confirmed their leg on read-back. The bookings are
